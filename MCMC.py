@@ -11,9 +11,20 @@ import math, random
 import matplotlib.pyplot as plt
 import time
 
+#We pass dimension via x0
 def MHRandomWalk(density,length,speed=0.5,x0=0,burnTime=200):
-    x = np.zeros(burnTime + length)
-    rvNormal = speed*np.random.randn(burnTime+length)
+    x = np.zeros(burnTime + length, x0.size)
+    rvNormal = speed*np.random.randn(burnTime + length, x0.size)
+    
+    #check we don't have any 0 vectors, if do generate new vector
+    zeroRows = checkZeroVector(rvNormal)
+    while(zeroRows.size != 0):
+        for i in zeroRows:
+            rvNormal[i] = speed*np.random.randn(x0.size)
+        zeroRows = checkZeroVector(rvNormal)
+    #TODO now make rvNormal to be on the unit sphere
+    #TODO update so that it's multi-dimensional
+
     x[0] = x0
     densityOld = density(x0)
     for i in range(1,burnTime + length):
@@ -50,7 +61,11 @@ def createGaussianEmulator(phi,kernal,designPoints):
     
     #At the moment just doing the simple case for \Phi_N(u) = mean(u)
     return mean     
-    
+
+def checkZeroVector(a):
+    #zeroRows are the rows we need new random numbers for (since they are at the origin)
+    zeroRows = (np.sum(np.fabs(a),1) == 0).nonzero()
+    return zeroRows[0]
 
 #%%Test case with easy phi.  G = identity
 #First neeed to generate some data y
