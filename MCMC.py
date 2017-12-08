@@ -13,16 +13,9 @@ import time
 
 #We pass dimension via x0
 def MHRandomWalk(density,length,speed=0.5,x0=0,burnTime=200):
-    x = np.zeros(burnTime + length, x0.size)
-    rvNormal = speed*np.random.randn(burnTime + length, x0.size)
-    
-    #check we don't have any 0 vectors, if do generate new vector
-    zeroRows = checkZeroVector(rvNormal)
-    while(zeroRows.size != 0):
-        for i in zeroRows:
-            rvNormal[i] = speed*np.random.randn(x0.size)
-        zeroRows = checkZeroVector(rvNormal)
-    #TODO now make rvNormal to be on the unit sphere
+    x = np.zeros((burnTime + length, x0.size))
+    #Generates normal rv in R^n of length=speed or 0.
+    rvNormal = speed*normalizeVector(np.random.randn(burnTime + length, x0.size))
     #TODO update so that it's multi-dimensional
 
     x[0] = x0
@@ -44,7 +37,7 @@ def MHRandomWalk(density,length,speed=0.5,x0=0,burnTime=200):
 
 
 root2Pi = math.sqrt(2*math.pi)
-normalDensity = lambda x: math.exp(-x**2/2)/root2Pi
+normalDensity = lambda x: math.exp(-np.sum(x**2)/2)/root2Pi
 
 def createGaussianEmulator(phi,kernal,designPoints):
     #Kernal has to be able to give out same shape as it gets in
@@ -62,10 +55,13 @@ def createGaussianEmulator(phi,kernal,designPoints):
     #At the moment just doing the simple case for \Phi_N(u) = mean(u)
     return mean     
 
-def checkZeroVector(a):
-    #zeroRows are the rows we need new random numbers for (since they are at the origin)
-    zeroRows = (np.sum(np.fabs(a),1) == 0).nonzero()
-    return zeroRows[0]
+def normalizeVector(a):
+    """Normalises the vector a but keeps 0 vectors as 0 vectors"""
+    norm = np.sum(a*a, 1)
+    for x in np.nditer(norm,op_flags=['readwrite']):
+        if(x == 0):
+            x[...] = 1
+    return a/(np.sqrt(norm)[:,None])
 
 #%%Test case with easy phi.  G = identity
 #First neeed to generate some data y
@@ -100,26 +96,45 @@ GP = createGaussianEmulator(phi,kernal,designPoints)
 densityPrior = lambda u: normalDensity(u)*np.exp(-phi(u))
 densityPost = lambda u: normalDensity(u)*np.exp(-GP(u))
 
-print('Running MCMC with length:', length)
-t0 = time.clock()
-distPrior = MHRandomWalk(densityPrior, length, speed=speedRandomWalk)
-t1 = time.clock()
-print('CPU time calculating distPrior:', t1-t0)
-
-t0 = time.clock()
-distPost = MHRandomWalk(densityPost, length, speed=speedRandomWalk)
-t1 = time.clock()
-print('CPU time calculating distPost:', t1-t0)
-
-#Timing if want it:
+#print('Running MCMC with length:', length)
 #t0 = time.clock()
-#x = MHRandom1Walk(normalDensity, length=1000000, speed=0.5)
+#distPrior = MHRandomWalk(densityPrior, length, speed=speedRandomWalk)
 #t1 = time.clock()
-#print('CPU time for loops in Python: non-vectorised', t1-t0)
+#print('CPU time calculating distPrior:', t1-t0)
+#
+#t0 = time.clock()
+#distPost = MHRandomWalk(densityPost, length, speed=speedRandomWalk)
+#t1 = time.clock()
+#print('CPU time calculating distPost:', t1-t0)
+
+
 
 
 #%% Plotting distributions of Prior and Post
-plt.hist(distPrior, bins=77, alpha=0.5, density=True, label='Prior')
-plt.hist(distPost, bins=77, alpha=0.5, density=True, label='Post')
-plt.legend(loc='upper right')
-plt.show()
+#plt.hist(distPrior, bins=77, alpha=0.5, density=True, label='Prior')
+#plt.hist(distPost, bins=77, alpha=0.5, density=True, label='Post')
+#plt.legend(loc='upper right')
+#plt.show()
+
+
+
+
+
+
+
+#%% Tests
+
+#%% Testing Metroplis-Hastings algorithm
+#t0 = time.clock()
+#x = MHRandomWalk(normalDensity, length=100000, speed=0.5, x0=np.array([0,0,0,0,0]))
+#t1 = time.clock()
+#print('CPU time for loops in Python', t1-t0)
+#plt.hist(x, bins=77,  density=True)
+#plt.show()
+
+#%% Check normaliseVector
+#print('Checking normaliseVector code')
+#a = np.array([[0,1],[0,0],[2,3]])
+#b = normalizeVector(a)
+#ans = np.array([[0,1],[0,0],[2/math.sqrt(13), 3/math.sqrt(13)]])
+#print('normaliseVector, Test 1:', np.allclose(b,ans))
