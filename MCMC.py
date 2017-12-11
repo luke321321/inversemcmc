@@ -9,10 +9,11 @@ Will later optimise using Numba/Cython
 import numpy as np
 import math, random
 import matplotlib.pyplot as plt
-import time
+#import time
+import cProfile, pstats
 
 #We pass dimension via x0
-def MHRandomWalk(density,length,speed=0.5,x0=np.array([0]),burnTime=200):
+def MHRandomWalk(density, length, speed=0.5, x0=np.array([0]), burnTime=200):
     if isinstance(x0, np.ndarray):
         dim = x0.size
     else:
@@ -41,9 +42,9 @@ def MHRandomWalk(density,length,speed=0.5,x0=np.array([0]),burnTime=200):
 
 
 root2Pi = math.sqrt(2*math.pi)
-normalDensity = lambda x: math.exp(-np.sum(x**2)/2)/root2Pi
+normalDensity = lambda x: math.exp(-np.dot(x,x)/2)/root2Pi
 
-def createGaussianEmulator(phi,kernal,designPoints):
+def createGaussianEmulator(phi, kernal, designPoints):
     #Kernal has to be able to give out same shape as it gets in
     phiStar = phi(designPoints)
     #Create K_*
@@ -53,20 +54,11 @@ def createGaussianEmulator(phi,kernal,designPoints):
     kernalStar = np.zeros((N,N))
     for i in range(N):
         for j in range(N):
-            kernalStar[i,j] = kernal(designPoints[i],designPoints[j])
+            kernalStar[i,j] = kernal(designPoints[i], designPoints[j])
     kernalStarInverse = np.linalg.inv(kernalStar)
-#    k = lambda u: kernal(u,phiStar) #N vector
     kernalStarInverseDotPhiStar = kernalStarInverse @ phiStar
-    #might need to have this vectorised for more dimensions
-#    vkernal = lambda x,y: np.vectorize(kernal(x,y))
-    def mean(u):
-        out = 0
-        for i in range(N):
-            out += kernal(u,designPoints[i])*kernalStarInverseDotPhiStar[i]
-        return out
-#    mean = lambda u: vkernal(u,designPoints) @ kernalStarInverseDotPhiStar
-    #kernalN = lambda x,y: kernal(x,y) - k(y) @ kernalStarInverse @ k(x)
-    
+    # K_*(u) = np.exp(np.einsum('ji,ji->j',u-designPoints,u-designPoints))
+    mean = lambda u : np.exp(-np.einsum('ji,ji->j',u-designPoints,u-designPoints)) @ kernalStarInverseDotPhiStar   
     #At the moment just doing the simple case for \Phi_N(u) = mean(u)
     return mean     
 
@@ -94,22 +86,23 @@ maxRange = 2
 u = np.random.randn(dimU)
 y = u + sigma*np.random.standard_normal(u.shape)
 
-phi = lambda u : np.linalg.norm(y-u)/(2*sigma)
+#phi(u) = |y-u|/(2sigma)
+phi = lambda u : math.sqrt(np.dot(y-u,y-u))/(2*sigma)
 v1phi = np.vectorize(lambda u: np.linalg.norm(y-u)/(2*sigma))
 v2phi = np.vectorize(lambda u: np.linalg.norm(y-u)/(2*sigma), signature='(i)->()')
 #Create a dummy kernal, just l^2 norm.  Vectorised with the correct signature
 #so can pass a list of vectors and will apply kernal correctly to the list
-kernal = lambda x,y: np.linalg.norm(x-y)
+kernal = lambda x,y: np.exp(-np.dot(x-y,x-y))
 
 #List of N^dimU design points in grid
 if dimU > 1:
     designPointsGrid = np.meshgrid(*[np.linspace(minRange,maxRange,numberDesignPoints) for _ in range(dimU)])
     designPoints = np.hstack(designPointsGrid).swapaxes(0,1).reshape(dimU,-1).T
     #or np.meshgrid(*[np.linspace(i,j,numPoints)[:-1] for i,j in zip(mins,maxs)])
-    GP = createGaussianEmulator(v2phi,kernal,designPoints)
+    GP = createGaussianEmulator(v2phi, kernal, designPoints)
 else:
-    designPoints = np.linspace(minRange,maxRange,numberDesignPoints)
-    GP = createGaussianEmulator(v1phi,kernal,designPoints)
+    designPoints = np.linspace(minRange, maxRange, numberDesignPoints)
+    GP = createGaussianEmulator(v1phi, kernal, designPoints)
 
 
 #Plotting phi and GP of phi:
@@ -146,29 +139,34 @@ densityPost = lambda u: normalDensity(u)*np.exp(-GP(u))
 
 x0 = np.zeros(dimU)
 print('Running MCMC with length:', length)
-t0 = time.clock()
-distPrior = MHRandomWalk(densityPrior, length, x0=x0, speed=speedRandomWalk)
-t1 = time.clock()
-print('CPU time calculating distPrior:', t1-t0)
+#t0 = time.clock()
+#distPrior = MHRandomWalk(densityPrior, length, x0=x0, speed=speedRandomWalk)
+#t1 = time.clock()
+#print('CPU time calculating distPrior:', t1-t0)
+#cProfile.runctx('MHRandomWalk(densityPost, length, x0=x0, speed=speedRandomWalk)'
+#                , globals(), locals(), '.prof')
+#s = pstats.Stats('.prof')
+#s.strip_dirs().sort_stats('time').print_stats(30)
 
-t0 = time.clock()
+#t0 = time.clock()
 distPost = MHRandomWalk(densityPost, length, x0=x0, speed=speedRandomWalk)
-t1 = time.clock()
-print('CPU time calculating distPost:', t1-t0)
+#t1 = time.clock()
+#print('CPU time calculating distPost:', t1-t0)
 
 
 
 #%% Plotting distributions of Prior and Post
-if dimU == 1:
-    plt.hist(distPrior, bins=77, alpha=0.5, density=True, label='Prior')
-    plt.hist(distPost, bins=77, alpha=0.5, density=True, label='Post')
-    plt.legend(loc='upper right')
-    plt.show()
-elif dimU == 2:
-    plt.hist(distPrior[:,0], bins=77, alpha=0.5, density=True, label='Prior')
-    plt.hist(distPost[:,0], bins=77, alpha=0.5, density=True, label='Post')
-    plt.legend(loc='upper right')
-    plt.show()
+if plotFlag:
+    if dimU == 1:
+        plt.hist(distPrior, bins=77, alpha=0.5, density=True, label='Prior')
+        plt.hist(distPost, bins=77, alpha=0.5, density=True, label='Post')
+        plt.legend(loc='upper right')
+        plt.show()
+    elif dimU == 2:
+        plt.hist(distPrior[:,0], bins=77, alpha=0.5, density=True, label='Prior')
+        plt.hist(distPost[:,0], bins=77, alpha=0.5, density=True, label='Post')
+        plt.legend(loc='upper right')
+        plt.show()
 
 #%% Tests
 
