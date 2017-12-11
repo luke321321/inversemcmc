@@ -9,6 +9,7 @@ Will later optimise using Numba/Cython
 import numpy as np
 import math, random
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 #import time
 import cProfile, pstats
 
@@ -76,7 +77,7 @@ def normalizeVector(a):
 sigma = 1
 dimU = 2
 length = 10**5 #length of random walk in MCMC
-numberDesignPoints = 5 #in each dimension
+numberDesignPoints = 10 #in each dimension
 speedRandomWalk = 0.5
 #End points of n-dim lattice for the design points
 minRange = -2
@@ -105,33 +106,6 @@ else:
     GP = createGaussianEmulator(v1phi, kernal, designPoints)
 
 
-#Plotting phi and GP of phi:
-plotFlag = 0
-if plotFlag == 1:      
-    #Vectorise GP for plotting
-    vGP = np.vectorize(lambda u: GP(u), signature='(i)->()')
-    if dimU == 1:
-        #This is just 1d plot
-        t = np.linspace(-2,2,10)
-        plt.plot(t,vGP(t))
-        #plt.plot(t,v2phi(t), color='green')
-        plt.plot(designPoints,v1phi(designPoints), 'ro')
-        plt.show()
-    elif dimU == 2:
-        X = np.linspace(minRange, maxRange, 10)
-        Y = np.linspace(minRange, maxRange, 10)
-        Z = np.hstack(np.meshgrid(X, Y)).swapaxes(0,1).reshape(2,-1).T
-        X = Z[:,0]
-        Y = Z[:,1]
-        
-        fig = plt.figure()
-        ax = fig.gca(projection='3d')
-        #Plot the surface
-        ax.plot_trisurf(X, Y, vGP(Z), antialiased=True)
-        #Plot the design points
-        ax.scatter(designPoints[:,0], designPoints[:,1], v2phi(designPoints), color='green')
-        plt.show()
-
 
 #%% Calculations
 densityPrior = lambda u: normalDensity(u)*np.exp(-phi(u))
@@ -140,7 +114,7 @@ densityPost = lambda u: normalDensity(u)*np.exp(-GP(u))
 x0 = np.zeros(dimU)
 print('Running MCMC with length:', length)
 #t0 = time.clock()
-#distPrior = MHRandomWalk(densityPrior, length, x0=x0, speed=speedRandomWalk)
+distPrior = MHRandomWalk(densityPrior, length, x0=x0, speed=speedRandomWalk)
 #t1 = time.clock()
 #print('CPU time calculating distPrior:', t1-t0)
 #cProfile.runctx('MHRandomWalk(densityPost, length, x0=x0, speed=speedRandomWalk)'
@@ -155,8 +129,37 @@ distPost = MHRandomWalk(densityPost, length, x0=x0, speed=speedRandomWalk)
 
 
 
-#%% Plotting distributions of Prior and Post
+#%% Plotting
+#Plotting phi and GP of phi:
+plotFlag = 1
+if plotFlag == 1:      
+    #Vectorise GP for plotting
+    vGP = np.vectorize(lambda u: GP(u), signature='(i)->()')
+    if dimU == 1:
+        #This is just 1d plot
+        t = np.linspace(-2,2,20)
+        plt.plot(t,vGP(t))
+        #plt.plot(t,v2phi(t), color='green')
+        plt.plot(designPoints,v1phi(designPoints), 'ro')
+        plt.show()
+    elif dimU == 2:
+        X = np.linspace(minRange, maxRange, 20)
+        Y = np.linspace(minRange, maxRange, 20)
+        Z = np.hstack(np.meshgrid(X, Y)).swapaxes(0,1).reshape(2,-1).T
+        X = Z[:,0]
+        Y = Z[:,1]
+        
+        fig = plt.figure()
+        ax = fig.gca(projection='3d')
+        #Plot the surface
+        ax.plot_trisurf(X, Y, vGP(Z), antialiased=True)
+        #Plot the design points
+        ax.scatter(designPoints[:,0], designPoints[:,1], v2phi(designPoints), color='green')
+        plt.show()
+        
+#%% Plot hist        
 if plotFlag:
+    plt.figure()
     if dimU == 1:
         plt.hist(distPrior, bins=77, alpha=0.5, density=True, label='Prior')
         plt.hist(distPost, bins=77, alpha=0.5, density=True, label='Post')
