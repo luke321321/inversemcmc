@@ -10,12 +10,15 @@ import numpy as np
 import math, random
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+#kv is modified Bessel function of second kind
+from scipy.special import gamma, kv
 #import time
 #import timeit
 #import cProfile, pstats
 
 #We pass dimension via x0
 def MHRandomWalk(density, length, speed=0.5, x0=np.array([0]), burnTime=200):
+    #Calculate dim of parameter space
     if isinstance(x0, np.ndarray):
         dim = x0.size
     else:
@@ -24,7 +27,7 @@ def MHRandomWalk(density, length, speed=0.5, x0=np.array([0]), burnTime=200):
     x = np.zeros((burnTime + length, dim))
     #Generates normal rv in R^n of length=speed or 0.
     rvNormal = speed*normalizeVector(np.random.randn(burnTime + length, dim))
-
+    
     x[0] = x0
     densityOld = density(x0)
     for i in range(1,burnTime + length):
@@ -90,6 +93,63 @@ def GaussianEmulator_exp(phi, designPoints):
     #At the moment just doing the simple case for \Phi_N(u) = mean(u)
     return mean
 
+def GaussianEmulator_Matern(phi, designPoints, mu = 0, sig2 = 1, lam = 1):
+    """Creates a Guassian Emulator with the kernel being a Matern Kernal.
+    Currently just sets the Guassian Emulator to be the mean
+    
+    Defaults: to Gaussian kernal
+    Gaussian: mu = 0
+    Exp: mu = 1/2
+        
+    """
+    phiStar = phi(designPoints)
+    N = designPoints.shape[0]
+
+    #NxNxdimU array with i,jth entry: (u_i,u_j)
+    designPointsList = np.tile(designPoints,(N,1)).reshape((N,N,3))
+    
+    #Transpose just first 2 axes but keep last one as is
+    #diff i,jth entry: u_i-u_j
+    diff = designPointsList-designPointsList.transpose((1,0,2))
+    #dot product on last axis only
+    r2 = np.einsum('ijk,ijk -> ij',diff,diff)
+    
+    if mu == 0:
+        kernalStar = sig2*np.exp(-r2/lam)
+    elif mu == 0.5:
+        kernalStar = sig2*np.exp(-np.sqrt(r2)/lam)
+    else:
+        rt2mu = math.sqrt(2*mu)/lam
+        const = (sig2/gamma(mu)*math.pow(2,mu-1))
+        kernalStar = const*np.power(rt2mu*r2,mu)*kv(mu,rt2mu*r2)
+        #if r2[i,j] = 0 then want kernalStar[i,j] = 1
+        #Asymptotics when r2 = 0 not the best
+        where_NaNs = np.isnan(kernalStar)
+        kernalStar[where_NaNs] = 1
+        
+    kernelStarInverse = np.linalg.inv(kernalStar)
+    kernelStarInverseDotPhiStar = kernelStarInverse @ phiStar
+    
+    #k_*(u) = kernal(u,u_i), u_i are design points
+    if mu == 0:
+        mean = lambda u : np.exp(-np.einsum('ij,ij->i',u-designPoints,u-designPoints)) @ kernelStarInverseDotPhiStar
+    elif mu == 0.5:
+        mean = lambda u : np.exp(-np.sqrt(np.einsum('ij,ij->i',u-designPoints,u-designPoints))) @ kernelStarInverseDotPhiStar
+    else:
+        def mean(u):
+            #Asymptotics when r2 = 0 not the best
+            r2 = np.einsum('ij,ij->i',u-designPoints,u-designPoints)
+            rt2mu = math.sqrt(2*mu)/lam
+            const = (sig2/gamma(mu)*math.pow(2,mu-1))
+            k_star = const*np.power(rt2mu*r2,mu)*kv(mu,rt2mu*r2)
+            #if r2[i,j] = 0 then want k_star[i,j] = 1
+            where_NaNs = np.isnan(k_star)
+            k_star[where_NaNs] = 1
+            return k_star @ kernelStarInverseDotPhiStar
+        
+    #At the moment just doing the simple case for \Phi_N(u) = mean(u)
+    return mean
+
 def GaussianEmulator(phi, kernel, designPoints):
     """Creates a Guassian Emulator with a given kernel.  SLOW since has loops
     Currently just sets the Guassian Emulator to be the mean"""
@@ -152,7 +212,7 @@ if dimU > 1:
     designPointsGrid = np.meshgrid(*[np.linspace(minRange,maxRange,numberDesignPoints) for _ in range(dimU)])
     designPoints = np.hstack(designPointsGrid).swapaxes(0,1).reshape(dimU,-1).T
     #or np.meshgrid(*[np.linspace(i,j,numPoints)[:-1] for i,j in zip(mins,maxs)])
-    GP = GaussianEmulator_Gauss(v2phi, designPoints)
+    GP = GaussianEmulator_Matern(v2phi, designPoints, 0)
 else:
     designPoints = np.linspace(minRange, maxRange, numberDesignPoints)
     GP = GaussianEmulator_Gauss(v1phi, designPoints)
