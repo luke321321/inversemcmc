@@ -11,7 +11,8 @@ import math, random
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 #import time
-import cProfile, pstats
+#import timeit
+#import cProfile, pstats
 
 #We pass dimension via x0
 def MHRandomWalk(density, length, speed=0.5, x0=np.array([0]), burnTime=200):
@@ -45,23 +46,52 @@ def MHRandomWalk(density, length, speed=0.5, x0=np.array([0]), burnTime=200):
 root2Pi = math.sqrt(2*math.pi)
 normalDensity = lambda x: math.exp(-np.dot(x,x)/2)/root2Pi
 
-def createGaussianEmulator(phi, kernal, designPoints):
-    #Kernal has to be able to give out same shape as it gets in
+def GaussianEmulator_Gauss(phi, designPoints):
+    """Creates a Guassian Emulator with the kernel being a Guassian.
+    Currently just sets the Guassian Emulator to be the mean"""
     phiStar = phi(designPoints)
-    #Create K_*
-#    i, j = np.meshgrid(designPoints,designPoints)
-#    kernalStar = kernal(i,j) #NxN matrix
     N = designPoints.shape[0]
-    kernalStar = np.zeros((N,N))
+
+    #NxNxdimU array with i,jth entry: (u_i,u_j)
+    designPointsList = np.tile(designPoints,(N,1)).reshape((N,N,3))
+    
+    #Transpose just first 2 axes but keep last one as is
+    #diff i,jth entry: u_i-u_j
+    diff = designPointsList-designPointsList.transpose((1,0,2))
+    #dot product on last axis only
+    diff2 = np.einsum('ijk,ijk -> ij',diff,diff)
+    kernelStar = np.exp(-diff2)
+    kernelStarInverse = np.linalg.inv(kernelStar)
+    kernelStarInverseDotPhiStar = kernelStarInverse @ phiStar
+    # K_*(u) = np.exp(np.einsum('ij,ij->i',u-designPoints,u-designPoints))
+    mean = lambda u : np.exp(-np.einsum('ij,ij->i',u-designPoints,u-designPoints)) @ kernelStarInverseDotPhiStar   
+    #At the moment just doing the simple case for \Phi_N(u) = mean(u)
+    return mean
+
+def GaussianEmulator(phi, kernel, designPoints):
+    """Creates a Guassian Emulator with a given kernel.  SLOW since has loops
+    Currently just sets the Guassian Emulator to be the mean"""
+    
+    phiStar = phi(designPoints)
+    N = designPoints.shape[0]
+    
+    #Create K_*:
+#    code for a general kernel:  SLOW since not vectorzed
+    kernelStar = np.zeros((N,N))
     for i in range(N):
         for j in range(N):
-            kernalStar[i,j] = kernal(designPoints[i], designPoints[j])
-    kernalStarInverse = np.linalg.inv(kernalStar)
-    kernalStarInverseDotPhiStar = kernalStarInverse @ phiStar
-    # K_*(u) = np.exp(np.einsum('ji,ji->j',u-designPoints,u-designPoints))
-    mean = lambda u : np.exp(-np.einsum('ji,ji->j',u-designPoints,u-designPoints)) @ kernalStarInverseDotPhiStar   
+            kernelStar[i,j] = kernel(designPoints[i], designPoints[j])
+    kernelStarInverse = np.linalg.inv(kernelStar)
+    kernelStarInverseDotPhiStar = kernelStarInverse @ phiStar
+    def mean(u):
+        k_star = np.zeros(N)
+        for i in range(N):
+            k_star[i] = kernel(u,designPoints[i])
+        
+        return k_star @ kernelStarInverseDotPhiStar   
+     
     #At the moment just doing the simple case for \Phi_N(u) = mean(u)
-    return mean     
+    return mean   
 
 def normalizeVector(a):
     """Normalises the vector 'a' but keeps 0 vectors as 0 vectors"""
@@ -75,7 +105,7 @@ def normalizeVector(a):
 #First neeed to generate some data y
 #setup
 sigma = 1
-dimU = 2
+dimU = 3
 length = 10**5 #length of random walk in MCMC
 numberDesignPoints = 10 #in each dimension
 speedRandomWalk = 0.5
@@ -91,19 +121,19 @@ y = u + sigma*np.random.standard_normal(u.shape)
 phi = lambda u : math.sqrt(np.dot(y-u,y-u))/(2*sigma)
 v1phi = np.vectorize(lambda u: np.linalg.norm(y-u)/(2*sigma))
 v2phi = np.vectorize(lambda u: np.linalg.norm(y-u)/(2*sigma), signature='(i)->()')
-#Create a dummy kernal, just l^2 norm.  Vectorised with the correct signature
-#so can pass a list of vectors and will apply kernal correctly to the list
-kernal = lambda x,y: np.exp(-np.dot(x-y,x-y))
+
+#Create a kernel, just e^(-l^2 norm).
+kernel = lambda x,y: np.exp(-np.dot(x-y,x-y))
 
 #List of N^dimU design points in grid
 if dimU > 1:
     designPointsGrid = np.meshgrid(*[np.linspace(minRange,maxRange,numberDesignPoints) for _ in range(dimU)])
     designPoints = np.hstack(designPointsGrid).swapaxes(0,1).reshape(dimU,-1).T
     #or np.meshgrid(*[np.linspace(i,j,numPoints)[:-1] for i,j in zip(mins,maxs)])
-    GP = createGaussianEmulator(v2phi, kernal, designPoints)
+    GP = GaussianEmulator_Gauss(v2phi, designPoints)
 else:
     designPoints = np.linspace(minRange, maxRange, numberDesignPoints)
-    GP = createGaussianEmulator(v1phi, kernal, designPoints)
+    GP = GaussianEmulator_Gauss(v1phi, designPoints)
 
 
 
@@ -131,7 +161,7 @@ distPost = MHRandomWalk(densityPost, length, x0=x0, speed=speedRandomWalk)
 
 #%% Plotting
 #Plotting phi and GP of phi:
-plotFlag = 1
+plotFlag = 0
 if plotFlag == 1:      
     #Vectorise GP for plotting
     vGP = np.vectorize(lambda u: GP(u), signature='(i)->()')
