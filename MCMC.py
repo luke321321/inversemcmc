@@ -68,6 +68,28 @@ def GaussianEmulator_Gauss(phi, designPoints):
     #At the moment just doing the simple case for \Phi_N(u) = mean(u)
     return mean
 
+def GaussianEmulator_exp(phi, designPoints):
+    """Creates a Guassian Emulator with the kernel being a Exponential.
+    Currently just sets the Guassian Emulator to be the mean"""
+    phiStar = phi(designPoints)
+    N = designPoints.shape[0]
+
+    #NxNxdimU array with i,jth entry: (u_i,u_j)
+    designPointsList = np.tile(designPoints,(N,1)).reshape((N,N,3))
+    
+    #Transpose just first 2 axes but keep last one as is
+    #diff i,jth entry: u_i-u_j
+    diff = designPointsList-designPointsList.transpose((1,0,2))
+    #dot product on last axis only
+    diff2 = np.einsum('ijk,ijk -> ij',diff,diff)
+    kernelStar = np.exp(-np.sqrt(diff2))
+    kernelStarInverse = np.linalg.inv(kernelStar)
+    kernelStarInverseDotPhiStar = kernelStarInverse @ phiStar
+    # K_*(u) = np.exp(np.einsum('ij,ij->i',u-designPoints,u-designPoints))
+    mean = lambda u : np.exp(-np.sqrt(np.einsum('ij,ij->i',u-designPoints,u-designPoints))) @ kernelStarInverseDotPhiStar   
+    #At the moment just doing the simple case for \Phi_N(u) = mean(u)
+    return mean
+
 def GaussianEmulator(phi, kernel, designPoints):
     """Creates a Guassian Emulator with a given kernel.  SLOW since has loops
     Currently just sets the Guassian Emulator to be the mean"""
@@ -161,7 +183,7 @@ distPost = MHRandomWalk(densityPost, length, x0=x0, speed=speedRandomWalk)
 
 #%% Plotting
 #Plotting phi and GP of phi:
-plotFlag = 0
+plotFlag = 1
 if plotFlag == 1:      
     #Vectorise GP for plotting
     vGP = np.vectorize(lambda u: GP(u), signature='(i)->()')
@@ -195,7 +217,7 @@ if plotFlag:
         plt.hist(distPost, bins=77, alpha=0.5, density=True, label='Post')
         plt.legend(loc='upper right')
         plt.show()
-    elif dimU == 2:
+    else:
         plt.hist(distPrior[:,0], bins=77, alpha=0.5, density=True, label='Prior')
         plt.hist(distPost[:,0], bins=77, alpha=0.5, density=True, label='Post')
         plt.legend(loc='upper right')
