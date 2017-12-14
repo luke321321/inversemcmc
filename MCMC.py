@@ -46,6 +46,14 @@ def MHRandomWalk(density, length, speed=0.5, x0=np.array([0]), burnTime=200):
     return x[200:]
 
 
+def normalizeVector(a):
+    """Normalises the vector 'a' but keeps 0 vectors as 0 vectors"""
+    norm = np.sum(a*a, 1)
+    for x in np.nditer(norm,op_flags=['readwrite']):
+        if(x == 0):
+            x[...] = 1
+    return a/(np.sqrt(norm)[:,None])
+
 root2Pi = math.sqrt(2*math.pi)
 normalDensity = lambda x: math.exp(-np.dot(x,x)/2)/root2Pi
 
@@ -175,13 +183,16 @@ def GaussianEmulator(phi, kernel, designPoints):
     #At the moment just doing the simple case for \Phi_N(u) = mean(u)
     return mean   
 
-def normalizeVector(a):
-    """Normalises the vector 'a' but keeps 0 vectors as 0 vectors"""
-    norm = np.sum(a*a, 1)
-    for x in np.nditer(norm,op_flags=['readwrite']):
-        if(x == 0):
-            x[...] = 1
-    return a/(np.sqrt(norm)[:,None])
+
+def stiffness(nodes,u):
+    """Creates the stiffness matrix from nodes and k(x;u)"""
+    #TODO check this method and finish off writing code for creating the matrix
+    def int_K(a,b,u):
+        dimU = u.size
+        j = np.arange(dimU)+1
+        toSum = u*(np.cos(2*np.pi*j*a) - np.cos(2*np.pi*j*b))/(2*np.pi*j)
+        return (b-a)/100 + np.sum(toSum)/(200*(dimU + 1))
+    
 
 #%%Test case with easy phi.  G = identity
 #First neeed to generate some data y
