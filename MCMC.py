@@ -93,13 +93,13 @@ def GaussianEmulator_exp(phi, designPoints):
     #At the moment just doing the simple case for \Phi_N(u) = mean(u)
     return mean
 
-def GaussianEmulator_Matern(phi, designPoints, mu = 0, sig2 = 1, lam = 1):
+def GaussianEmulator_Matern(phi, designPoints, nu = 0, sig2 = 1, lam = 1):
     """Creates a Guassian Emulator with the kernel being a Matern Kernal.
     Currently just sets the Guassian Emulator to be the mean
     
     Defaults: to Gaussian kernal
-    Gaussian: mu = 0
-    Exp: mu = 1/2
+    Gaussian: nu = 0
+    Exp: nu = 1/2
         
     """
     phiStar = phi(designPoints)
@@ -114,14 +114,14 @@ def GaussianEmulator_Matern(phi, designPoints, mu = 0, sig2 = 1, lam = 1):
     #dot product on last axis only
     r2 = np.einsum('ijk,ijk -> ij',diff,diff)
     
-    if mu == 0:
+    if nu == 0:
         kernalStar = sig2*np.exp(-r2/lam)
-    elif mu == 0.5:
+    elif nu == 0.5:
         kernalStar = sig2*np.exp(-np.sqrt(r2)/lam)
     else:
-        rt2mu = math.sqrt(2*mu)/lam
-        const = (sig2/gamma(mu)*math.pow(2,mu-1))
-        kernalStar = const*np.power(rt2mu*r2,mu)*kv(mu,rt2mu*r2)
+        rt2nu = math.sqrt(2*nu)/lam
+        const = (sig2/gamma(nu)*math.pow(2,nu-1))
+        kernalStar = const*np.power(rt2nu*r2,nu)*kv(nu,rt2nu*r2)
         #if r2[i,j] = 0 then want kernalStar[i,j] = 1
         #Asymptotics when r2 = 0 not the best
         where_NaNs = np.isnan(kernalStar)
@@ -131,17 +131,17 @@ def GaussianEmulator_Matern(phi, designPoints, mu = 0, sig2 = 1, lam = 1):
     kernelStarInverseDotPhiStar = kernelStarInverse @ phiStar
     
     #k_*(u) = kernal(u,u_i), u_i are design points
-    if mu == 0:
+    if nu == 0:
         mean = lambda u : np.exp(-np.einsum('ij,ij->i',u-designPoints,u-designPoints)) @ kernelStarInverseDotPhiStar
-    elif mu == 0.5:
+    elif nu == 0.5:
         mean = lambda u : np.exp(-np.sqrt(np.einsum('ij,ij->i',u-designPoints,u-designPoints))) @ kernelStarInverseDotPhiStar
     else:
         def mean(u):
             #Asymptotics when r2 = 0 not the best
             r2 = np.einsum('ij,ij->i',u-designPoints,u-designPoints)
-            rt2mu = math.sqrt(2*mu)/lam
-            const = (sig2/gamma(mu)*math.pow(2,mu-1))
-            k_star = const*np.power(rt2mu*r2,mu)*kv(mu,rt2mu*r2)
+            rt2nu = math.sqrt(2*nu)/lam
+            const = (sig2/gamma(nu)*math.pow(2,nu-1))
+            k_star = const*np.power(rt2nu*r2,nu)*kv(nu,rt2nu*r2)
             #if r2[i,j] = 0 then want k_star[i,j] = 1
             where_NaNs = np.isnan(k_star)
             k_star[where_NaNs] = 1
