@@ -186,13 +186,25 @@ def GaussianEmulator(phi, kernel, designPoints):
 
 def stiffness(nodes,u):
     """Creates the stiffness matrix from nodes and k(x;u)"""
-    #TODO check this method and finish off writing code for creating the matrix
-    def int_K(a,b,u):
+
+    def intKNodes(nodes,u):
+        """Calculates the integral of k(x;u) over nodes 'nodes'"""
         dimU = u.size
+        a = nodes[:-1] #slicing: -1 = end-1
+        b = nodes[1:] 
         j = np.arange(dimU)+1
-        toSum = u*(np.cos(2*np.pi*j*a) - np.cos(2*np.pi*j*b))/(2*np.pi*j)
-        return (b-a)/100 + np.sum(toSum)/(200*(dimU + 1))
+        
+        #tile arrays to 2d arrays
+        A = np.broadcast_to(a,(dimU,a.size))
+        B = np.broadcast_to(b,(dimU,b.size))
+        J = np.broadcast_to(np.arange(dimU)+1,(a.size,dimU)).T
+        U = np.broadcast_to(u,(a.size,dimU)).T
+        
+        #calculate k(x;u) at nodes x
+        toSum = U*(np.cos(2*np.pi*J*A) - np.cos(2*np.pi*J*A))/(2*np.pi*J)
+        return (b-a)/100 + np.sum(toSum, axis=0)/(200*(dimU + 1))
     
+    #TODO: finish off writing code for creating the matrix    
 
 #%%Test case with easy phi.  G = identity
 #First neeed to generate some data y
@@ -222,7 +234,7 @@ kernel = lambda x,y: np.exp(-np.dot(x-y,x-y))
 if dimU > 1:
     designPointsGrid = np.meshgrid(*[np.linspace(minRange,maxRange,numberDesignPoints) for _ in range(dimU)])
     designPoints = np.hstack(designPointsGrid).swapaxes(0,1).reshape(dimU,-1).T
-    #or np.meshgrid(*[np.linspace(i,j,numPoints)[:-1] for i,j in zip(mins,maxs)])
+    #0 is Gaussian kernal
     GP = GaussianEmulator_Matern(v2phi, designPoints, 0)
 else:
     designPoints = np.linspace(minRange, maxRange, numberDesignPoints)
