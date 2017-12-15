@@ -12,8 +12,9 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 #kv is modified Bessel function of second kind
 from scipy.special import gamma, kv
-#import time
-#import timeit
+from scipy.sparse import diags
+from scipy.sparse.linalg import spsolve
+#import time, timeit
 #import cProfile, pstats
 
 #We pass dimension via x0
@@ -183,28 +184,67 @@ def GaussianEmulator(phi, kernel, designPoints):
     #At the moment just doing the simple case for \Phi_N(u) = mean(u)
     return mean   
 
-
-def stiffness(nodes,u):
-    """Creates the stiffness matrix from nodes and k(x;u)"""
-
-    def intKNodes(nodes,u):
-        """Calculates the integral of k(x;u) over nodes 'nodes'"""
-        dimU = u.size
-        a = nodes[:-1] #slicing: -1 = end-1
-        b = nodes[1:] 
-        j = np.arange(dimU)+1
-        
-        #tile arrays to 2d arrays
-        A = np.broadcast_to(a,(dimU,a.size))
-        B = np.broadcast_to(b,(dimU,b.size))
-        J = np.broadcast_to(np.arange(dimU)+1,(a.size,dimU)).T
-        U = np.broadcast_to(u,(a.size,dimU)).T
-        
-        #calculate k(x;u) at nodes x
-        toSum = U*(np.cos(2*np.pi*J*A) - np.cos(2*np.pi*J*A))/(2*np.pi*J)
-        return (b-a)/100 + np.sum(toSum, axis=0)/(200*(dimU + 1))
+#%%
+def solvePDE(u,N):
+    """Solves the PDE in (0,1) with coefficients u and
+    N number of Chebyshev interpolant points"""
     
-    #TODO: finish off writing code for creating the matrix    
+    #create N Chebyshev nodes in (0,1)
+    nodes = np.zeros(N+2)
+    nodes[1:-1] = np.cos((2*np.arange(N)+1)*np.pi/(2*N) - np.pi)/2 + 0.5
+    nodes[-1] = 1
+    
+    A = stiffnessMatrix(nodes,u)
+    b = calB(nodes)
+    
+    #solve the PDE
+    p = spsolve(A,b)
+    return p, nodes
+
+def stiffnessMatrix(nodes,u):
+    """Returns the sparse stiffness matrix from nodes and k(x;u), nodes include enpoints"""
+    #To speed up could just call integralK once and then splice that
+    
+    #calculate derivative of basis functions - which is just a step function
+    vL = 1/(nodes[1:-1] - nodes[:-2])
+    vR = 1/(nodes[2:] - nodes[1:-1])
+    
+    #integrate K between the nodes
+    intK = integralK(nodes[:-1],nodes[1:],u)
+    
+    #Construct the stiffness matrix
+    diag0 = (vL**2)*intK[:-1] + (vR**2)*intK[1:]
+    diag1 = -vR[:-1]*vL[1:]*intK[1:-1]
+    A = diags([diag1,diag0,diag1],[-1,0,1], format="csr")
+    return A
+
+def calB(nodes):
+    """Returns the vector b to solve the PDE"""
+    return (nodes[2:] - nodes[:-2])/2
+
+def integralK(a,b,u):
+    """Returns the integral of k(x;u) from a to b, both 1d arrays of the same dimension"""
+    dimU = u.size
+    
+    #tile arrays to 2d arrays
+    A = np.broadcast_to(a,(dimU,a.size))
+    B = np.broadcast_to(b,(dimU,b.size))
+    J = np.broadcast_to(np.arange(dimU)+1,(a.size,dimU)).T
+    U = np.broadcast_to(u,(a.size,dimU)).T
+    
+    #calculate k(x;u) at nodes x
+    toSum = U*(np.cos(2*np.pi*J*A) - np.cos(2*np.pi*J*B))/(2*np.pi*J)
+    return (b-a)/100 + np.sum(toSum, axis=0)/(200*(dimU + 1))
+
+##Testing code for PDE solver
+#u = np.random.randn(20)
+#N = 100000
+#p,nodes = solvePDE(u,N)
+#plt.plot(nodes[1:-1],p)
+#cProfile.runctx('integralK(nodes[:-1],nodes[1:],u)'
+#                , globals(), locals(), '.prof')
+#s = pstats.Stats('.prof')
+#s.strip_dirs().sort_stats('time').print_stats(30)
 
 #%%Test case with easy phi.  G = identity
 #First neeed to generate some data y
