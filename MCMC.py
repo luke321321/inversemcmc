@@ -13,12 +13,17 @@ from mpl_toolkits.mplot3d import Axes3D
 #kv is modified Bessel function of second kind
 from scipy.special import gamma, kv
 from scipy.sparse import diags
-from scipy.sparse.linalg import spsolve
-#import time, timeit
-#import cProfile, pstats
+#from scipy.sparse.linalg import spsolve
+#Quicker sparse LA solver:
+from pypardiso import spsolve
+#Progress bar
+from tqdm import tqdm
+
+import time, timeit
+import cProfile, pstats
 
 #We pass dimension via x0
-def MHRandomWalk(density, length, speed=0.5, x0=np.array([0]), burnTime=200):
+def MHRandomWalk(density, length, speed=0.5, x0=np.array([0]), burnTime=1000):
     #Calculate dim of parameter space
     if isinstance(x0, np.ndarray):
         dim = x0.size
@@ -27,95 +32,51 @@ def MHRandomWalk(density, length, speed=0.5, x0=np.array([0]), burnTime=200):
         
     x = np.zeros((burnTime + length, dim))
     #Generates normal rv in R^n of length=speed or 0.
-    rvNormal = speed*normalizeVector(np.random.randn(burnTime + length, dim))
+    rvNormal = speed*np.random.randn(burnTime + length, dim)
+    
+    acceptNumbers = 0
     
     x[0] = x0
     densityOld = density(x0)
-    for i in range(1,burnTime + length):
+    for i in tqdm(range(1,burnTime + length)):
         y = x[i-1] + rvNormal[i]
         if(densityOld == 0): #Accept whatever
             x[i] = y
             densityOld = density(y)
+            if i > burnTime:
+                acceptNumbers += 1
         else:
             u = random.random()
             densityNew = density(y)
             if(u <= min(1,densityNew/densityOld)): #check acceptance
                 x[i] = y
                 densityOld = densityNew
+                if i > burnTime:
+                    acceptNumbers += 1
             else:
                 x[i] = x[i-1]
-    return x[200:]
+    return acceptNumbers, x[200:]
 
 
-def normalizeVector(a):
-    """Normalises the vector 'a' but keeps 0 vectors as 0 vectors"""
-    norm = np.sum(a*a, 1)
-    for x in np.nditer(norm,op_flags=['readwrite']):
-        if(x == 0):
-            x[...] = 1
-    return a/(np.sqrt(norm)[:,None])
-
-root2Pi = math.sqrt(2*math.pi)
-normalDensity = lambda x: math.exp(-np.dot(x,x)/2)/root2Pi
-
-def GaussianEmulator_Gauss(phi, designPoints):
-    """Creates a Guassian Emulator with the kernel being a Guassian.
-    Currently just sets the Guassian Emulator to be the mean"""
-    phiStar = phi(designPoints)
-    N = designPoints.shape[0]
-
-    #NxNxdimU array with i,jth entry: (u_i,u_j)
-    designPointsList = np.tile(designPoints,(N,1)).reshape((N,N,3))
-    
-    #Transpose just first 2 axes but keep last one as is
-    #diff i,jth entry: u_i-u_j
-    diff = designPointsList-designPointsList.transpose((1,0,2))
-    #dot product on last axis only
-    diff2 = np.einsum('ijk,ijk -> ij',diff,diff)
-    kernelStar = np.exp(-diff2)
-    kernelStarInverse = np.linalg.inv(kernelStar)
-    kernelStarInverseDotPhiStar = kernelStarInverse @ phiStar
-    # K_*(u) = np.exp(np.einsum('ij,ij->i',u-designPoints,u-designPoints))
-    mean = lambda u : np.exp(-np.einsum('ij,ij->i',u-designPoints,u-designPoints)) @ kernelStarInverseDotPhiStar   
-    #At the moment just doing the simple case for \Phi_N(u) = mean(u)
-    return mean
-
-def GaussianEmulator_exp(phi, designPoints):
-    """Creates a Guassian Emulator with the kernel being a Exponential.
-    Currently just sets the Guassian Emulator to be the mean"""
-    phiStar = phi(designPoints)
-    N = designPoints.shape[0]
-
-    #NxNxdimU array with i,jth entry: (u_i,u_j)
-    designPointsList = np.tile(designPoints,(N,1)).reshape((N,N,3))
-    
-    #Transpose just first 2 axes but keep last one as is
-    #diff i,jth entry: u_i-u_j
-    diff = designPointsList-designPointsList.transpose((1,0,2))
-    #dot product on last axis only
-    diff2 = np.einsum('ijk,ijk -> ij',diff,diff)
-    kernelStar = np.exp(-np.sqrt(diff2))
-    kernelStarInverse = np.linalg.inv(kernelStar)
-    kernelStarInverseDotPhiStar = kernelStarInverse @ phiStar
-    # K_*(u) = np.exp(np.einsum('ij,ij->i',u-designPoints,u-designPoints))
-    mean = lambda u : np.exp(-np.sqrt(np.einsum('ij,ij->i',u-designPoints,u-designPoints))) @ kernelStarInverseDotPhiStar   
-    #At the moment just doing the simple case for \Phi_N(u) = mean(u)
-    return mean
-
-def GaussianEmulator_Matern(phi, designPoints, nu = 0, sig2 = 1, lam = 1):
+def GaussianEmulator_Matern(phi, designPoints, nu = np.inf, sig2 = 1, lam = 1):
     """Creates a Guassian Emulator with the kernel being a Matern Kernal.
     Currently just sets the Guassian Emulator to be the mean
     
     Defaults: to Gaussian kernal
-    Gaussian: nu = 0
+    Gaussian: nu = np.inf
     Exp: nu = 1/2
         
     """
     phiStar = phi(designPoints)
     N = designPoints.shape[0]
+    if len(designPoints.shape) == 1:
+        dim = 1
+    else:
+        dim = designPoints.shape[1]
+    
 
     #NxNxdimU array with i,jth entry: (u_i,u_j)
-    designPointsList = np.tile(designPoints,(N,1)).reshape((N,N,3))
+    designPointsList = np.tile(designPoints,(N,1)).reshape((N,N,dim))
     
     #Transpose just first 2 axes but keep last one as is
     #diff i,jth entry: u_i-u_j
@@ -123,7 +84,7 @@ def GaussianEmulator_Matern(phi, designPoints, nu = 0, sig2 = 1, lam = 1):
     #dot product on last axis only
     r2 = np.einsum('ijk,ijk -> ij',diff,diff)
     
-    if nu == 0:
+    if nu == np.inf:
         kernalStar = sig2*np.exp(-r2/lam)
     elif nu == 0.5:
         kernalStar = sig2*np.exp(-np.sqrt(r2)/lam)
@@ -140,14 +101,23 @@ def GaussianEmulator_Matern(phi, designPoints, nu = 0, sig2 = 1, lam = 1):
     kernelStarInverseDotPhiStar = kernelStarInverse @ phiStar
     
     #k_*(u) = kernal(u,u_i), u_i are design points
-    if nu == 0:
-        mean = lambda u : np.exp(-np.einsum('ij,ij->i',u-designPoints,u-designPoints)) @ kernelStarInverseDotPhiStar
+    if nu == np.inf:
+        if dim > 1:
+            mean = lambda u : np.exp(-np.einsum('ij,ij->i',u-designPoints,u-designPoints)) @ kernelStarInverseDotPhiStar
+        else:
+            mean = lambda u : np.exp(-np.square(u-designPoints)) @ kernelStarInverseDotPhiStar
     elif nu == 0.5:
-        mean = lambda u : np.exp(-np.sqrt(np.einsum('ij,ij->i',u-designPoints,u-designPoints))) @ kernelStarInverseDotPhiStar
+        if dim > 1:
+            mean = lambda u : np.exp(-np.sqrt(np.einsum('ij,ij->i',u-designPoints,u-designPoints))) @ kernelStarInverseDotPhiStar
+        else:
+            mean = lambda u : np.exp(-np.absolute(u-designPoints)) @ kernelStarInverseDotPhiStar
     else:
         def mean(u):
             #Asymptotics when r2 = 0 not the best
-            r2 = np.einsum('ij,ij->i',u-designPoints,u-designPoints)
+            if dim > 1:
+                r2 = np.einsum('ij,ij->i',u-designPoints,u-designPoints)
+            else:
+                r2 = np.square(u-designPoints)
             rt2nu = math.sqrt(2*nu)/lam
             const = (sig2/gamma(nu)*math.pow(2,nu-1))
             k_star = const*np.power(rt2nu*r2,nu)*kv(nu,rt2nu*r2)
@@ -224,7 +194,10 @@ def calB(nodes):
 
 def integralK(a,b,u):
     """Returns the integral of k(x;u) from a to b, both 1d arrays of the same dimension"""
-    dimU = u.size
+    if isinstance(u, np.ndarray):
+        dimU = u.size
+    else:
+        dimU = 1
     
     #tile arrays to 2d arrays
     A = np.broadcast_to(a,(dimU,a.size))
@@ -236,12 +209,21 @@ def integralK(a,b,u):
     toSum = U*(np.cos(2*np.pi*J*A) - np.cos(2*np.pi*J*B))/(2*np.pi*J)
     return (b-a)/100 + np.sum(toSum, axis=0)/(200*(dimU + 1))
 
+def solvePDEatx(u,N,x):
+    """Solves the PDE in (0,1) with coefficients u and
+    N number of Chebyshev interpolant points, and returns the value of p(x) where 0 < x < 1"""
+    p, nodes = solvePDE(u,N)
+    i = np.searchsorted(nodes, x)
+    return (p[i-1]*(x - nodes[i-1])+ p[i]*(nodes[i] - x))/(nodes[i] - nodes[i-1])
+
 ##Testing code for PDE solver
-#u = np.random.randn(20)
+#u = np.random.randn(1)
 #N = 100000
+#x = 0.45
 #p,nodes = solvePDE(u,N)
 #plt.plot(nodes[1:-1],p)
-#cProfile.runctx('integralK(nodes[:-1],nodes[1:],u)'
+#print('Value at 0.5:', solvePDEatx(u,N,0.5))
+#cProfile.runctx('solvePDEatx(u,N,x)'
 #                , globals(), locals(), '.prof')
 #s = pstats.Stats('.prof')
 #s.strip_dirs().sort_stats('time').print_stats(30)
@@ -249,56 +231,79 @@ def integralK(a,b,u):
 #%%Test case with easy phi.  G = identity
 #First neeed to generate some data y
 #setup
-sigma = 1
-dimU = 3
-length = 10**5 #length of random walk in MCMC
+sigma = 0.1
+dimU = 2
+length = 10**4 #length of random walk in MCMC
 numberDesignPoints = 10 #in each dimension
-speedRandomWalk = 0.5
+speedRandomWalk = 0.4
 #End points of n-dim lattice for the design points
-minRange = -2
-maxRange = 2
+minRange = -1
+maxRange = 1
+#need above 1000
+numObs = 1
+N=10**3
+x=0.45
 
 #Generate data
-u = np.random.randn(dimU)
-y = u + sigma*np.random.standard_normal(u.shape)
+#The truth uDagger lives in [-1,0.5]
+uDagger = np.random.rand(dimU) - 1
+#uDagger = -0.3
+GuDagger = solvePDEatx(uDagger,N,x)
+y = GuDagger
+#y = np.broadcast_to(GuDagger,(numObs,dimU)) + sigma*np.random.standard_normal((numObs,dimU))
 
-#phi(u) = |y-u|/(2sigma)
-phi = lambda u : math.sqrt(np.dot(y-u,y-u))/(2*sigma)
-v1phi = np.vectorize(lambda u: np.linalg.norm(y-u)/(2*sigma))
-v2phi = np.vectorize(lambda u: np.linalg.norm(y-u)/(2*sigma), signature='(i)->()')
+root2Pi = math.sqrt(2*math.pi)
+normalDensity = lambda x: math.exp(-np.dot(x,x)/2)/root2Pi
+#uniform density for [-1,1]
+uniformDensity = lambda x: 1*((np.dot(x,x) <= 2) & (x-0.5 <= 0).all())
+normalDensity2 = lambda x: math.exp(-np.dot(x,x)/8)*(np.dot(x,x) <= 4)
 
-#Create a kernel, just e^(-l^2 norm).
-kernel = lambda x,y: np.exp(-np.dot(x-y,x-y))
+#phi(u) = |y-u|^2/(2sigma)
+#phi = lambda u : math.sqrt(np.dot(y-u,y-u))/(2*sigma)
+phi = lambda u: np.sum((y-solvePDEatx(u,N,x))**2)/(2*sigma*numObs)
+#phi = lambda u: ((y-u)**2)/2
+v1phi = np.vectorize(lambda u: np.linalg.norm(y-solvePDEatx(u,N,x))/(2*sigma))
+v2phi = np.vectorize(lambda u: np.linalg.norm(y-solvePDEatx(u,N,x))/(2*sigma), signature='(i)->()')
+
 
 #List of N^dimU design points in grid
 if dimU > 1:
     designPointsGrid = np.meshgrid(*[np.linspace(minRange,maxRange,numberDesignPoints) for _ in range(dimU)])
     designPoints = np.hstack(designPointsGrid).swapaxes(0,1).reshape(dimU,-1).T
-    #0 is Gaussian kernal
-    GP = GaussianEmulator_Matern(v2phi, designPoints, 0)
+    #nu = np.inf means process has Gaussian kernal
+    GP = GaussianEmulator_Matern(v2phi, designPoints, np.inf)
 else:
     designPoints = np.linspace(minRange, maxRange, numberDesignPoints)
-    GP = GaussianEmulator_Gauss(v1phi, designPoints)
+    #nu = np.inf means process has Gaussian kernal
+    GP = GaussianEmulator_Matern(v1phi, designPoints, np.inf)
 
 
 
 #%% Calculations
-densityPrior = lambda u: normalDensity(u)*np.exp(-phi(u))
-densityPost = lambda u: normalDensity(u)*np.exp(-GP(u))
+#u lives in [-1,1] so use uniform dist as prior
+densityPrior = lambda u: normalDensity2(u)*np.exp(-phi(u))
+densityPost = lambda u: uniformDensity(u)*np.exp(-GP(u))
+
+
 
 x0 = np.zeros(dimU)
+print('Parameter is:', uDagger)
+print('Solution to PDE at',x,'for true parameter is:', GuDagger)
+print('Mean of', numObs,'observations is:', np.sum(y,0)/numObs)
 print('Running MCMC with length:', length)
-#t0 = time.clock()
-distPrior = MHRandomWalk(densityPrior, length, x0=x0, speed=speedRandomWalk)
-#t1 = time.clock()
-#print('CPU time calculating distPrior:', t1-t0)
-#cProfile.runctx('MHRandomWalk(densityPost, length, x0=x0, speed=speedRandomWalk)'
+t0 = time.clock()
+accepts, distPrior = MHRandomWalk(densityPrior, length, x0=x0, speed=speedRandomWalk)
+t1 = time.clock()
+print('CPU time calculating distPrior:', t1-t0)
+#cProfile.runctx('MHRandomWalk(densityPrior, length, x0=x0, speed=speedRandomWalk)'
 #                , globals(), locals(), '.prof')
 #s = pstats.Stats('.prof')
 #s.strip_dirs().sort_stats('time').print_stats(30)
+print('Mean of distPrior is:', np.sum(distPrior,0)/length)
+print('We accepted this number of times:', accepts)
 
 #t0 = time.clock()
-distPost = MHRandomWalk(densityPost, length, x0=x0, speed=speedRandomWalk)
+#distPost = MHRandomWalk(densityPost, length, x0=x0, speed=speedRandomWalk)
 #t1 = time.clock()
 #print('CPU time calculating distPost:', t1-t0)
 
@@ -306,13 +311,14 @@ distPost = MHRandomWalk(densityPost, length, x0=x0, speed=speedRandomWalk)
 
 #%% Plotting
 #Plotting phi and GP of phi:
-plotFlag = 1
-if plotFlag == 1:      
+plotFlag = 0
+if plotFlag:      
     #Vectorise GP for plotting
     vGP = np.vectorize(lambda u: GP(u), signature='(i)->()')
     if dimU == 1:
         #This is just 1d plot
-        t = np.linspace(-2,2,20)
+        t = np.linspace(minRange,maxRange,20)
+        vGP = np.vectorize(lambda u: GP(u))
         plt.plot(t,vGP(t))
         #plt.plot(t,v2phi(t), color='green')
         plt.plot(designPoints,v1phi(designPoints), 'ro')
@@ -332,19 +338,38 @@ if plotFlag == 1:
         ax.scatter(designPoints[:,0], designPoints[:,1], v2phi(designPoints), color='green')
         plt.show()
         
-#%% Plot hist        
+#%% Plot hist  
+plotFlag = 1
 if plotFlag:
     plt.figure()
     if dimU == 1:
-        plt.hist(distPrior, bins=77, alpha=0.5, density=True, label='Prior')
-        plt.hist(distPost, bins=77, alpha=0.5, density=True, label='Post')
+        plt.hist(distPrior, bins=101, alpha=0.5, density=True, label='Prior')
+#        plt.hist(distPost, bins=101, alpha=0.5, density=True, label='Post')
         plt.legend(loc='upper right')
         plt.show()
     else:
-        plt.hist(distPrior[:,0], bins=77, alpha=0.5, density=True, label='Prior')
-        plt.hist(distPost[:,0], bins=77, alpha=0.5, density=True, label='Post')
+        plt.hist(distPrior[:,0], bins=101, alpha=0.5, density=True, label='Prior')
+#        plt.hist(distPost[:,0], bins=101, alpha=0.5, density=True, label='Post')
         plt.legend(loc='upper right')
         plt.show()
+        
+#%% Plot Likelihood:
+#likelihood for debugging and checking problems
+plotFlag = 0
+if plotFlag:
+    plt.figure()
+    X = np.linspace(-2,2,40)
+    vlikelihood = np.vectorize(lambda u,y: np.exp(-np.sum((solvePDEatx(y,N,x)-solvePDEatx(u,N,x))**2)/(2*sigma*numObs)))
+    for i in np.linspace(-1,1,5):
+        plt.plot(X,vlikelihood(i,X),label=i)
+        
+#%% Plot solution to PDE at different parameters
+plotFlag = 0
+if plotFlag:
+    plt.figure()
+    X = np.linspace(-2,2,40)
+    vPDEatx = np.vectorize(lambda u: solvePDEatx(u,N,x))
+    plt.plot(X,vPDEatx(X))
 
 #%% Tests
 
