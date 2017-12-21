@@ -13,6 +13,8 @@ from mpl_toolkits.mplot3d import Axes3D
 #kv is modified Bessel function of second kind
 from scipy.special import gamma, kv
 from scipy.sparse import diags
+from scipy.stats import multivariate_normal
+from scipy.interpolate import RegularGridInterpolator, interp1d
 #from scipy.sparse.linalg import spsolve
 #Quicker sparse LA solver:
 from pypardiso import spsolve
@@ -98,7 +100,7 @@ def GaussianEmulator_Matern(phi, designPoints, nu = np.inf, sig2 = 1, lam = 1):
     kernelStarInverseDotPhiStar = kernelStarInverse @ phiStar
     
     mean = lambda u : k(u,designPoints) @ kernelStarInverseDotPhiStar
-    kernalN = lambda u,v: k(u,v) - k(v,designPoints) @ kernelStarInverse @ k(u,designPoints)
+    kernalN = lambda u,v: k(u,v) - k(v,designPoints) @ kernelStarInverse @ k(u,designPoints).T
     
     return mean, kernalN
 
@@ -190,7 +192,7 @@ def solvePDEatx(u,N,x):
     i = np.searchsorted(nodes, x)
     return (p[i-1]*(x - nodes[i-1])+ p[i]*(nodes[i] - x))/(nodes[i] - nodes[i-1])
 
-##Testing code for PDE solver
+#%%Testing code for PDE solver
 #u = np.random.randn(1)
 #N = 100000
 #x = 0.45
@@ -201,27 +203,37 @@ def solvePDEatx(u,N,x):
 #                , globals(), locals(), '.prof')
 #s = pstats.Stats('.prof')
 #s.strip_dirs().sort_stats('time').print_stats(30)
+    
+def createUniformGrid(minRange,maxRange,n,dim):
+    if dim > 1:
+        gridPointsGrid = np.meshgrid(*[np.linspace(minRange,maxRange,n) for _ in range(dim)])
+        gridPoints = np.hstack(gridPointsGrid).swapaxes(0,1).reshape(dim,-1).T
+    else:
+        gridPoints = np.linspace(minRange, maxRange, n)[:,np.newaxis]
+    return gridPoints
 
-#%%Test case with easy phi.  G = identity
+#%% Setup variables and functions
 #First neeed to generate some data y
 #setup
 sigma = 0.1
-dimU = 2
+dimU = 1
 length = 10**4 #length of random walk in MCMC
-numberDesignPoints = 10 #in each dimension
+numberDesignPoints = 5 #in each dimension
 speedRandomWalk = 0.4
 #End points of n-dim lattice for the design points
 minRange = -1
 maxRange = 1
 #need above 1000
 numObs = 1
+#number basis functions for solving PDE
 N=10**3
+#point to solve PDE at
 x=0.45
 
 #Generate data
 #The truth uDagger lives in [-1,0.5]
-uDagger = np.random.rand(dimU) - 1
-#uDagger = -0.3
+#uDagger = np.random.rand(dimU) - 1
+uDagger = -0.3
 GuDagger = solvePDEatx(uDagger,N,x)
 y = GuDagger
 #y = np.broadcast_to(GuDagger,(numObs,dimU)) + sigma*np.random.standard_normal((numObs,dimU))
@@ -236,63 +248,87 @@ normalDensity2 = lambda x: math.exp(-np.dot(x,x)/8)*(np.dot(x,x) <= 4)
 #phi = lambda u : math.sqrt(np.dot(y-u,y-u))/(2*sigma)
 phi = lambda u: np.sum((y-solvePDEatx(u,N,x))**2)/(2*sigma*numObs)
 #phi = lambda u: ((y-u)**2)/2
-v1phi = np.vectorize(lambda u: np.linalg.norm(y-solvePDEatx(u,N,x))**2/(2*sigma*numObs))
-v2phi = np.vectorize(lambda u: np.linalg.norm(y-solvePDEatx(u,N,x))**2/(2*sigma*numObs), signature='(i)->()')
 
-
-#List of N^dimU design points in grid
+#Create Gaussian Process
+designPoints = createUniformGrid(minRange,maxRange,numberDesignPoints, dimU)
 if dimU > 1:
-    designPointsGrid = np.meshgrid(*[np.linspace(minRange,maxRange,numberDesignPoints) for _ in range(dimU)])
-    designPoints = np.hstack(designPointsGrid).swapaxes(0,1).reshape(dimU,-1).T
-    #nu = np.inf means process has Gaussian kernal
-    GP = GaussianEmulator_Matern(v2phi, designPoints, np.inf)
+    vphi = np.vectorize(lambda u: np.linalg.norm(y-solvePDEatx(u,N,x))**2/(2*sigma*numObs))
+    GP_mean, GP_kernel = GaussianEmulator_Matern(vphi, designPoints, np.inf)
 else:
-    designPoints = np.linspace(minRange, maxRange, numberDesignPoints)
-    #nu = np.inf means process has Gaussian kernal
-    GP = GaussianEmulator_Matern(v1phi, designPoints, np.inf)
+    vphi = np.vectorize(lambda u: np.linalg.norm(y-solvePDEatx(u,N,x))**2/(2*sigma*numObs), signature='(i)->()')
+    GP_mean, GP_kernel = GaussianEmulator_Matern(vphi, designPoints, np.inf)
+    
+piN_rand = lambda u: np.exp(-GP_mean(u))*normalDensity2(u)
 
+#%% Generate \phi_N
+numberGPGridPoints = 50
+numberGPRealisations = 100
+GPGridPoints = createUniformGrid(minRange, maxRange, numberGPGridPoints, dimU)
+#create Gaussian Process - generate random variables by calling GP_rv.rvs()
+GP_rv = multivariate_normal(GP_mean(GPGridPoints), GP_kernel(GPGridPoints,GPGridPoints), allow_singular=True)
 
+if dimU == 1:
+    phiN_marginal = interp1d(GPGridPoints.squeeze(), GP_rv.rvs(),
+                                            copy=False, assume_sorted=True)
+else:
+    phiN_marginal = RegularGridInterpolator(GPGridPoints.squeeze(),GP_rv.rvs())
+piN_marginal = lambda u: np.exp(-phiN_marginal(u))*normalDensity2(u)
+
+#TODO piN_marginal throws and error if interpolation is outside of range - is it enough for it to be nan?
+# Or do we interpolate over longer range?
+
+#TODO check n-dim case!
 
 #%% Calculations
 #u lives in [-1,1] so use uniform dist as prior
 densityPrior = lambda u: normalDensity2(u)*np.exp(-phi(u))
-densityPost = lambda u: uniformDensity(u)*np.exp(-GP(u))
+densityPost = lambda u: uniformDensity(u)*np.exp(-GP_mean(u))
 
+n = 30
+Xtest = np.linspace(-1, 1, n).reshape(-1,1)
+f_post = np.random.multivariate_normal(GP_mean(Xtest), GP_kernel(Xtest,Xtest), size=50).T
+plt.figure()
+plt.plot(Xtest, f_post)
+plt.plot(designPoints,vphi(designPoints), 'ro')
+plt.title('30 sample from the GP posterior')
+#plt.axis([-1, 1, -3, 3])
+plt.show()
 
-
-x0 = np.zeros(dimU)
-print('Parameter is:', uDagger)
-print('Solution to PDE at',x,'for true parameter is:', GuDagger)
-print('Mean of', numObs,'observations is:', np.sum(y,0)/numObs)
-print('Running MCMC with length:', length)
-t0 = time.clock()
-accepts, distPrior = MHRandomWalk(densityPrior, length, x0=x0, speed=speedRandomWalk)
-t1 = time.clock()
-print('CPU time calculating distPrior:', t1-t0)
-#cProfile.runctx('MHRandomWalk(densityPrior, length, x0=x0, speed=speedRandomWalk)'
-#                , globals(), locals(), '.prof')
-#s = pstats.Stats('.prof')
-#s.strip_dirs().sort_stats('time').print_stats(30)
-print('Mean of distPrior is:', np.sum(distPrior,0)/length)
-print('We accepted this number of times:', accepts)
-
-#t0 = time.clock()
-#distPost = MHRandomWalk(densityPost, length, x0=x0, speed=speedRandomWalk)
-#t1 = time.clock()
-#print('CPU time calculating distPost:', t1-t0)
+flagRunMCMC = 0
+if flagRunMCMC:
+    x0 = np.zeros(dimU)
+    print('Parameter is:', uDagger)
+    print('Solution to PDE at',x,'for true parameter is:', GuDagger)
+    print('Mean of', numObs,'observations is:', np.sum(y,0)/numObs)
+    print('Running MCMC with length:', length)
+    t0 = time.clock()
+    accepts, distPrior = MHRandomWalk(densityPrior, length, x0=x0, speed=speedRandomWalk)
+    t1 = time.clock()
+    print('CPU time calculating distPrior:', t1-t0)
+    #cProfile.runctx('MHRandomWalk(densityPrior, length, x0=x0, speed=speedRandomWalk)'
+    #                , globals(), locals(), '.prof')
+    #s = pstats.Stats('.prof')
+    #s.strip_dirs().sort_stats('time').print_stats(30)
+    print('Mean of distPrior is:', np.sum(distPrior,0)/length)
+    print('We accepted this number of times:', accepts)
+    
+    #t0 = time.clock()
+    #distPost = MHRandomWalk(densityPost, length, x0=x0, speed=speedRandomWalk)
+    #t1 = time.clock()
+    #print('CPU time calculating distPost:', t1-t0)
 
 
 
 #%% Plotting
 #Plotting phi and GP of phi:
-plotFlag = 0
-if plotFlag:      
+flagPlot = 0
+if flagPlot:      
     #Vectorise GP for plotting
-    vGP = np.vectorize(lambda u: GP(u), signature='(i)->()')
+    vGP = np.vectorize(lambda u: GP_mean(u), signature='(i)->()')
     if dimU == 1:
         #This is just 1d plot
         t = np.linspace(minRange,maxRange,20)
-        vGP = np.vectorize(lambda u: GP(u))
+        vGP = np.vectorize(lambda u: GP_mean(u))
         plt.plot(t,vGP(t))
         #plt.plot(t,v2phi(t), color='green')
         plt.plot(designPoints,v1phi(designPoints), 'ro')
@@ -313,8 +349,8 @@ if plotFlag:
         plt.show()
         
 #%% Plot hist  
-plotFlag = 1
-if plotFlag:
+flagPlot = 0
+if flagPlot:
     plt.figure()
     if dimU == 1:
         plt.hist(distPrior, bins=101, alpha=0.5, density=True, label='Prior')
@@ -329,8 +365,8 @@ if plotFlag:
         
 #%% Plot Likelihood:
 #likelihood for debugging and checking problems
-plotFlag = 0
-if plotFlag:
+flagPlot = 0
+if flagPlot:
     plt.figure()
     X = np.linspace(-2,2,40)
     vlikelihood = np.vectorize(lambda u,y: np.exp(-np.sum((solvePDEatx(y,N,x)-solvePDEatx(u,N,x))**2)/(2*sigma*numObs)))
@@ -338,14 +374,12 @@ if plotFlag:
         plt.plot(X,vlikelihood(i,X),label=i)
         
 #%% Plot solution to PDE at different parameters
-plotFlag = 0
-if plotFlag:
+flagPlot = 0
+if flagPlot:
     plt.figure()
     X = np.linspace(-2,2,40)
     vPDEatx = np.vectorize(lambda u: solvePDEatx(u,N,x))
     plt.plot(X,vPDEatx(X))
-
-#%% Tests
 
 #%% Testing Metroplis-Hastings algorithm
 #t0 = time.clock()
@@ -355,7 +389,7 @@ if plotFlag:
 #plt.hist(x, bins=77,  density=True)
 #plt.show()
 
-#%% Check normaliseVector
+#%% Testing normaliseVector
 #print('Checking normaliseVector code')
 #a = np.array([[0,1],[0,0],[2,3]])
 #b = normalizeVector(a)
