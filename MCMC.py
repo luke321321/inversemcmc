@@ -60,101 +60,75 @@ def MHRandomWalk(density, length, speed=0.5, x0=np.array([0]), burnTime=1000):
 
 def GaussianEmulator_Matern(phi, designPoints, nu = np.inf, sig2 = 1, lam = 1):
     """Creates a Guassian Emulator with the kernel being a Matern Kernal.
-    Currently just sets the Guassian Emulator to be the mean
+    Returns functions mean(u), kernalN(u,v)
     
     Defaults: to Gaussian kernal
     Gaussian: nu = np.inf
     Exp: nu = 1/2
-        
+    
+    Note for functions mean(u), kernalN(u,v) 
+    If u.shape = (4,1) then u is an array of 1d points, if u.shape = (4,) then u is a vector
+    and the same for v 
     """
     phiStar = phi(designPoints)
-    N = designPoints.shape[0]
+    
+    #if the designPoints are 1d append empty axis for r2Distance method
     if len(designPoints.shape) == 1:
-        dim = 1
-    else:
-        dim = designPoints.shape[1]
+        designPoints = designPoints[:,np.newaxis]
     
-
-    #NxNxdimU array with i,jth entry: (u_i,u_j)
-    designPointsList = np.tile(designPoints,(N,1)).reshape((N,N,dim))
-    
-    #Transpose just first 2 axes but keep last one as is
-    #diff i,jth entry: u_i-u_j
-    diff = designPointsList-designPointsList.transpose((1,0,2))
-    #dot product on last axis only
-    r2 = np.einsum('ijk,ijk -> ij',diff,diff)
-    
-    if nu == np.inf:
-        kernalStar = sig2*np.exp(-r2/lam)
-    elif nu == 0.5:
-        kernalStar = sig2*np.exp(-np.sqrt(r2)/lam)
-    else:
-        rt2nu = math.sqrt(2*nu)/lam
-        const = (sig2/gamma(nu)*math.pow(2,nu-1))
-        kernalStar = const*np.power(rt2nu*r2,nu)*kv(nu,rt2nu*r2)
-        #if r2[i,j] = 0 then want kernalStar[i,j] = 1
-        #Asymptotics when r2 = 0 not the best
-        where_NaNs = np.isnan(kernalStar)
-        kernalStar[where_NaNs] = 1
+    def k(u, v, nu = np.inf, sig2 = 1, lam = 1):
+        r2 = r2Distance(u,v)
         
-    kernelStarInverse = np.linalg.inv(kernalStar)
-    kernelStarInverseDotPhiStar = kernelStarInverse @ phiStar
-    
-    #k_*(u) = kernal(u,u_i), u_i are design points
-    if nu == np.inf:
-        if dim > 1:
-            mean = lambda u : np.exp(-np.einsum('ij,ij->i',u-designPoints,u-designPoints)) @ kernelStarInverseDotPhiStar
+        if nu == np.inf:
+            return np.exp(-r2)
+        elif nu == 0.5:
+            return sig2*np.exp(-np.sqrt(r2)/lam)
         else:
-            mean = lambda u : np.exp(-np.square(u-designPoints)) @ kernelStarInverseDotPhiStar
-    elif nu == 0.5:
-        if dim > 1:
-            mean = lambda u : np.exp(-np.sqrt(np.einsum('ij,ij->i',u-designPoints,u-designPoints))) @ kernelStarInverseDotPhiStar
-        else:
-            mean = lambda u : np.exp(-np.absolute(u-designPoints)) @ kernelStarInverseDotPhiStar
-    else:
-        def mean(u):
-            #Asymptotics when r2 = 0 not the best
-            if dim > 1:
-                r2 = np.einsum('ij,ij->i',u-designPoints,u-designPoints)
-            else:
-                r2 = np.square(u-designPoints)
             rt2nu = math.sqrt(2*nu)/lam
             const = (sig2/gamma(nu)*math.pow(2,nu-1))
-            k_star = const*np.power(rt2nu*r2,nu)*kv(nu,rt2nu*r2)
-            #if r2[i,j] = 0 then want k_star[i,j] = 1
-            where_NaNs = np.isnan(k_star)
-            k_star[where_NaNs] = 1
-            return k_star @ kernelStarInverseDotPhiStar
-        
-    #At the moment just doing the simple case for \Phi_N(u) = mean(u)
-    return mean
-
-def GaussianEmulator(phi, kernel, designPoints):
-    """Creates a Guassian Emulator with a given kernel.  SLOW since has loops
-    Currently just sets the Guassian Emulator to be the mean"""
+            kuv = const*np.power(rt2nu*r2,nu)*kv(nu,rt2nu*r2)
+            
+            #if r2[i,j] = 0 then want kernalStar[i,j] = 1
+            #Asymptotics when r2 = 0 not the best
+            where_NaNs = np.isnan(kuv)
+            kuv[where_NaNs] = 1
+            return kuv
     
-    phiStar = phi(designPoints)
-    N = designPoints.shape[0]
-    
-    #Create K_*:
-#    code for a general kernel:  SLOW since not vectorzed
-    kernelStar = np.zeros((N,N))
-    for i in range(N):
-        for j in range(N):
-            kernelStar[i,j] = kernel(designPoints[i], designPoints[j])
-    kernelStarInverse = np.linalg.inv(kernelStar)
+    kernelStarInverse = np.linalg.inv(k(designPoints,designPoints))
     kernelStarInverseDotPhiStar = kernelStarInverse @ phiStar
-    def mean(u):
-        k_star = np.zeros(N)
-        for i in range(N):
-            k_star[i] = kernel(u,designPoints[i])
-        
-        return k_star @ kernelStarInverseDotPhiStar   
-     
-    #At the moment just doing the simple case for \Phi_N(u) = mean(u)
-    return mean   
+    
+    mean = lambda u : k(u,designPoints) @ kernelStarInverseDotPhiStar
+    kernalN = lambda u,v: k(u,v) - k(v,designPoints) @ kernelStarInverse @ k(u,designPoints)
+    
+    return mean, kernalN
 
-#%%
+def r2Distance(u,v):
+    """Calculates the l^2 distance squared between u and v for u,v being points,
+    vectors or list of vectors and returns a point, vector or matrix as appropriate.
+    Dimensions of the vectors has to be the same
+    
+    Note if u.shape = (4,1) then u is an array of 1d points, if u.shape = (4,) then u is a vector.
+    
+    If u.shape = (m x d), v.shape = (n x d) then r2.shape = (m x n)
+    If u.shape = (m,)     v.shape = (n x d) then r2.shape = (m x n)
+    If u.shape = (m,)     v.shape = (n,)    then r2.shape = (m x n)
+    If m or n = 1 then that dimension is squeezed out of r2.shape"""
+    
+    #First calculate vector/matrix of length of u-v
+    dimU = len(u.shape)
+    dimV = len(v.shape)
+    if (dimU == 1 and dimV == 1):
+        r2 = np.sum(np.square(u-v))
+    else:
+        V = v[np.newaxis,:]
+        U = u[:,np.newaxis]
+        if dimU == 1:
+            U = U.T
+        diff = U-V
+        r2 = np.squeeze(np.einsum('ijk,ijk->ij',diff,diff))
+    return r2
+
+#%% PDE solver code
 def solvePDE(u,N):
     """Solves the PDE in (0,1) with coefficients u and
     N number of Chebyshev interpolant points"""
@@ -262,8 +236,8 @@ normalDensity2 = lambda x: math.exp(-np.dot(x,x)/8)*(np.dot(x,x) <= 4)
 #phi = lambda u : math.sqrt(np.dot(y-u,y-u))/(2*sigma)
 phi = lambda u: np.sum((y-solvePDEatx(u,N,x))**2)/(2*sigma*numObs)
 #phi = lambda u: ((y-u)**2)/2
-v1phi = np.vectorize(lambda u: np.linalg.norm(y-solvePDEatx(u,N,x))/(2*sigma))
-v2phi = np.vectorize(lambda u: np.linalg.norm(y-solvePDEatx(u,N,x))/(2*sigma), signature='(i)->()')
+v1phi = np.vectorize(lambda u: np.linalg.norm(y-solvePDEatx(u,N,x))**2/(2*sigma*numObs))
+v2phi = np.vectorize(lambda u: np.linalg.norm(y-solvePDEatx(u,N,x))**2/(2*sigma*numObs), signature='(i)->()')
 
 
 #List of N^dimU design points in grid
