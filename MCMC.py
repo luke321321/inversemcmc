@@ -4,7 +4,6 @@ Created on Wed Dec  6 14:33:52 2017
 
 @author: s1002685
 
-Will later optimise using Numba/Cython
 """
 import numpy as np
 import math, random
@@ -57,7 +56,7 @@ def MHRandomWalk(density, length, speed=0.5, x0=np.array([0]), burnTime=1000):
                     acceptNumbers += 1
             else:
                 x[i] = x[i-1]
-    return acceptNumbers, x[200:]
+    return acceptNumbers, x[burnTime:]
 
 
 def GaussianEmulator_Matern(phi, designPoints, nu = np.inf, sig2 = 1, lam = 1):
@@ -219,7 +218,7 @@ sigma = 0.1
 dimU = 1
 length = 10**4 #length of random walk in MCMC
 numberDesignPoints = 5 #in each dimension
-speedRandomWalk = 0.4
+speedRandomWalk = 0.1
 #End points of n-dim lattice for the design points
 minRange = -1
 maxRange = 1
@@ -233,7 +232,7 @@ x=0.45
 #Generate data
 #The truth uDagger lives in [-1,0.5]
 #uDagger = np.random.rand(dimU) - 1
-uDagger = -0.3
+uDagger = -0.7
 GuDagger = solvePDEatx(uDagger,N,x)
 y = GuDagger
 #y = np.broadcast_to(GuDagger,(numObs,dimU)) + sigma*np.random.standard_normal((numObs,dimU))
@@ -241,7 +240,8 @@ y = GuDagger
 root2Pi = math.sqrt(2*math.pi)
 normalDensity = lambda x: math.exp(-np.dot(x,x)/2)/root2Pi
 #uniform density for [-1,1]
-uniformDensity = lambda x: 1*((np.dot(x,x) <= 2) & (x-0.5 <= 0).all())
+uniformDensity = lambda x: 1*(np.dot(x,x) <= 2)
+#uniformDensity = lambda x: 1*((np.dot(x,x) <= 2) & (x-0.5 <= 0).all())
 normalDensity2 = lambda x: math.exp(-np.dot(x,x)/8)*(np.dot(x,x) <= 4)
 
 #phi(u) = |y-u|^2/(2sigma)
@@ -253,10 +253,10 @@ phi = lambda u: np.sum((y-solvePDEatx(u,N,x))**2)/(2*sigma*numObs)
 designPoints = createUniformGrid(minRange,maxRange,numberDesignPoints, dimU)
 if dimU > 1:
     vphi = np.vectorize(lambda u: np.linalg.norm(y-solvePDEatx(u,N,x))**2/(2*sigma*numObs))
-    GP_mean, GP_kernel = GaussianEmulator_Matern(vphi, designPoints, np.inf)
+    GP_mean, GP_kernel = GaussianEmulator_Matern(vphi, designPoints, 1/2)
 else:
     vphi = np.vectorize(lambda u: np.linalg.norm(y-solvePDEatx(u,N,x))**2/(2*sigma*numObs), signature='(i)->()')
-    GP_mean, GP_kernel = GaussianEmulator_Matern(vphi, designPoints, np.inf)
+    GP_mean, GP_kernel = GaussianEmulator_Matern(vphi, designPoints, 1/2)
     
 piN_rand = lambda u: np.exp(-GP_mean(u))*normalDensity2(u)
 
@@ -281,9 +281,12 @@ piN_marginal = lambda u: np.exp(-phiN_marginal(u))*normalDensity2(u)
 
 #%% Calculations
 #u lives in [-1,1] so use uniform dist as prior
-densityPrior = lambda u: normalDensity2(u)*np.exp(-phi(u))
+#OR can use normalDensity2, which is normal with cutoff |x| < 2 
+densityPrior = lambda u: uniformDensity(u)*np.exp(-phi(u))
 densityPost = lambda u: uniformDensity(u)*np.exp(-GP_mean(u))
 
+
+#Testing generating Gaussian Process
 n = 30
 Xtest = np.linspace(-1, 1, n).reshape(-1,1)
 f_post = np.random.multivariate_normal(GP_mean(Xtest), GP_kernel(Xtest,Xtest), size=50).T
@@ -300,17 +303,20 @@ if flagRunMCMC:
     print('Parameter is:', uDagger)
     print('Solution to PDE at',x,'for true parameter is:', GuDagger)
     print('Mean of', numObs,'observations is:', np.sum(y,0)/numObs)
-    print('Running MCMC with length:', length)
-    t0 = time.clock()
+    print('Running MCMC with length:', length, 'and speed:', speedRandomWalk)
+#    t0 = time.clock()
     accepts, distPrior = MHRandomWalk(densityPrior, length, x0=x0, speed=speedRandomWalk)
-    t1 = time.clock()
-    print('CPU time calculating distPrior:', t1-t0)
+#    t1 = time.clock()
+#    print('CPU time calculating distPrior:', t1-t0)
     #cProfile.runctx('MHRandomWalk(densityPrior, length, x0=x0, speed=speedRandomWalk)'
     #                , globals(), locals(), '.prof')
     #s = pstats.Stats('.prof')
     #s.strip_dirs().sort_stats('time').print_stats(30)
-    print('Mean of distPrior is:', np.sum(distPrior,0)/length)
+    meanDistPrior = np.sum(distPrior,0)/length
+    print('Mean of distPrior is:', meanDistPrior)
     print('We accepted this number of times:', accepts)
+    solatMean = solvePDEatx(meanDistPrior,N,x)
+    print('Solution to PDE at mean of distPrior is:', solatMean)
     
     #t0 = time.clock()
     #distPost = MHRandomWalk(densityPost, length, x0=x0, speed=speedRandomWalk)
@@ -331,7 +337,7 @@ if flagPlot:
         vGP = np.vectorize(lambda u: GP_mean(u))
         plt.plot(t,vGP(t))
         #plt.plot(t,v2phi(t), color='green')
-        plt.plot(designPoints,v1phi(designPoints), 'ro')
+        plt.plot(designPoints,vphi(designPoints), 'ro')
         plt.show()
     elif dimU == 2:
         X = np.linspace(minRange, maxRange, 20)
@@ -349,19 +355,17 @@ if flagPlot:
         plt.show()
         
 #%% Plot hist  
-flagPlot = 0
+flagPlot = 1
 if flagPlot:
     plt.figure()
     if dimU == 1:
         plt.hist(distPrior, bins=101, alpha=0.5, density=True, label='Prior')
 #        plt.hist(distPost, bins=101, alpha=0.5, density=True, label='Post')
-        plt.legend(loc='upper right')
-        plt.show()
     else:
         plt.hist(distPrior[:,0], bins=101, alpha=0.5, density=True, label='Prior')
 #        plt.hist(distPost[:,0], bins=101, alpha=0.5, density=True, label='Post')
-        plt.legend(loc='upper right')
-        plt.show()
+    plt.legend(loc='upper right')
+    plt.show()
         
 #%% Plot Likelihood:
 #likelihood for debugging and checking problems
@@ -372,6 +376,20 @@ if flagPlot:
     vlikelihood = np.vectorize(lambda u,y: np.exp(-np.sum((solvePDEatx(y,N,x)-solvePDEatx(u,N,x))**2)/(2*sigma*numObs)))
     for i in np.linspace(-1,1,5):
         plt.plot(X,vlikelihood(i,X),label=i)
+    plt.legend(loc='upper right')
+    plt.title('Likelihood for different truths uDagger')
+    plt.show()
+
+#likelihood for uDagger
+flagPlot = 0
+if flagPlot:
+    plt.figure()
+    X = np.linspace(-2,2,40)
+    vlikelihood = np.vectorize(lambda u,y: np.exp(-np.sum((solvePDEatx(y,N,x)-solvePDEatx(u,N,x))**2)/(2*sigma*numObs)))
+    plt.plot(X,vlikelihood(uDagger,X),label=str(uDagger))
+    plt.legend(loc='upper right')
+    plt.title('Likelihood for different truth uDagger' + str(uDagger))
+    plt.show()
         
 #%% Plot solution to PDE at different parameters
 flagPlot = 0
@@ -380,6 +398,8 @@ if flagPlot:
     X = np.linspace(-2,2,40)
     vPDEatx = np.vectorize(lambda u: solvePDEatx(u,N,x))
     plt.plot(X,vPDEatx(X))
+    plt.title('Solution to PDE for different parameters')
+    plt.show()
 
 #%% Testing Metroplis-Hastings algorithm
 #t0 = time.clock()
