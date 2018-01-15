@@ -16,6 +16,7 @@ from scipy.stats import multivariate_normal
 from scipy.interpolate import RegularGridInterpolator, interp1d
 #from scipy.sparse.linalg import spsolve
 #Quicker sparse LA solver:
+#install via: 'conda install -c haasad pypardiso'
 from pypardiso import spsolve
 #Progress bar
 from tqdm import tqdm
@@ -244,12 +245,9 @@ uniformDensity = lambda x: 1*(np.dot(x,x) <= 2)
 #uniformDensity = lambda x: 1*((np.dot(x,x) <= 2) & (x-0.5 <= 0).all())
 normalDensity2 = lambda x: math.exp(-np.dot(x,x)/8)*(np.dot(x,x) <= 4)
 
-#phi(u) = |y-u|^2/(2sigma)
-#phi = lambda u : math.sqrt(np.dot(y-u,y-u))/(2*sigma)
 phi = lambda u: np.sum((y-solvePDEatx(u,N,x))**2)/(2*sigma*numObs)
-#phi = lambda u: ((y-u)**2)/2
 
-#Create Gaussian Process
+#Create Gaussian Process with exp kernel
 designPoints = createUniformGrid(minRange,maxRange,numberDesignPoints, dimU)
 if dimU > 1:
     vphi = np.vectorize(lambda u: np.linalg.norm(y-solvePDEatx(u,N,x))**2/(2*sigma*numObs))
