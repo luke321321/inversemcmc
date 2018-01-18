@@ -191,18 +191,6 @@ def solvePDEatx(u,N,x):
     p, nodes = solvePDE(u,N)
     i = np.searchsorted(nodes, x)
     return (p[i-1]*(x - nodes[i-1])+ p[i]*(nodes[i] - x))/(nodes[i] - nodes[i-1])
-
-#%%Testing code for PDE solver
-#u = np.random.randn(1)
-#N = 100000
-#x = 0.45
-#p,nodes = solvePDE(u,N)
-#plt.plot(nodes[1:-1],p)
-#print('Value at 0.5:', solvePDEatx(u,N,0.5))
-#cProfile.runctx('solvePDEatx(u,N,x)'
-#                , globals(), locals(), '.prof')
-#s = pstats.Stats('.prof')
-#s.strip_dirs().sort_stats('time').print_stats(30)
     
 def createUniformGrid(minRange,maxRange,n,dim):
     if dim > 1:
@@ -251,10 +239,9 @@ phi = lambda u: np.sum((y-solvePDEatx(u,N,x))**2)/(2*sigma*numObs)
 designPoints = createUniformGrid(minRange,maxRange,numberDesignPoints, dimU)
 if dimU > 1:
     vphi = np.vectorize(lambda u: np.linalg.norm(y-solvePDEatx(u,N,x))**2/(2*sigma*numObs))
-    GP_mean, GP_kernel = GaussianEmulator_Matern(vphi, designPoints, 1/2)
 else:
     vphi = np.vectorize(lambda u: np.linalg.norm(y-solvePDEatx(u,N,x))**2/(2*sigma*numObs), signature='(i)->()')
-    GP_mean, GP_kernel = GaussianEmulator_Matern(vphi, designPoints, 1/2)
+GP_mean, GP_kernel = GaussianEmulator_Matern(vphi, designPoints, 1/2)
     
 piN_rand = lambda u: np.exp(-GP_mean(u))*normalDensity2(u)
 
@@ -285,13 +272,13 @@ densityPost = lambda u: uniformDensity(u)*np.exp(-GP_mean(u))
 
 
 #Testing generating Gaussian Process
-n = 30
+n = 50
 Xtest = np.linspace(-1, 1, n).reshape(-1,1)
 f_post = np.random.multivariate_normal(GP_mean(Xtest), GP_kernel(Xtest,Xtest), size=50).T
 plt.figure()
 plt.plot(Xtest, f_post)
 plt.plot(designPoints,vphi(designPoints), 'ro')
-plt.title('30 sample from the GP posterior')
+plt.title('50 sample from the GP posterior')
 #plt.axis([-1, 1, -3, 3])
 plt.show()
 
@@ -353,7 +340,7 @@ if flagPlot:
         plt.show()
         
 #%% Plot hist  
-flagPlot = 1
+flagPlot = 0
 if flagPlot:
     plt.figure()
     if dimU == 1:
@@ -406,10 +393,15 @@ if flagPlot:
 #print('CPU time for loops in Python', t1-t0)
 #plt.hist(x, bins=77,  density=True)
 #plt.show()
-
-#%% Testing normaliseVector
-#print('Checking normaliseVector code')
-#a = np.array([[0,1],[0,0],[2,3]])
-#b = normalizeVector(a)
-#ans = np.array([[0,1],[0,0],[2/math.sqrt(13), 3/math.sqrt(13)]])
-#print('normaliseVector, Test 1:', np.allclose(b,ans))
+    
+#%%Testing code for PDE solver
+#u = np.random.randn(1)
+#N = 100000
+#x = 0.45
+#p,nodes = solvePDE(u,N)
+#plt.plot(nodes[1:-1],p)
+#print('Value at 0.5:', solvePDEatx(u,N,0.5))
+#cProfile.runctx('solvePDEatx(u,N,x)'
+#                , globals(), locals(), '.prof')
+#s = pstats.Stats('.prof')
+#s.strip_dirs().sort_stats('time').print_stats(30)
