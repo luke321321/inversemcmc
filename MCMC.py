@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Created on Wed Dec  6 14:33:52 2017
 
@@ -207,7 +206,7 @@ def create_uniform_grid(min_range,max_range,n,dim):
 #First neeed to generate some data y
 #setup
 sigma = 0.1
-dim_U = 1
+dim_U = 2
 length = 10**4 #length of random walk in MCMC
 num_design_points = 5 #in each dimension
 speed_random_walk = 0.1
@@ -223,8 +222,8 @@ x=0.45
 
 #Generate data
 #The truth u_dagger lives in [-1,0.5]
-#u_dagger = np.random.rand(dim_U) - 1
-u_dagger = -0.7
+u_dagger = np.random.rand(dim_U) - 1
+#u_dagger = -0.7
 G_u_dagger = solve_PDE_at_x(u_dagger,N,x)
 y = G_u_dagger
 #y = np.broadcast_to(G_u_dagger,(num_obs,dim_U)) + sigma*np.random.standard_normal((num_obs,dim_U))
@@ -275,7 +274,7 @@ density_post = lambda u: uniform_density(u)*np.exp(-GP_mean(u))
 
 
 #Testing generating Gaussian Process
-n = 50
+n = 100
 X_test = np.linspace(-1, 1, n).reshape(-1,1)
 f_post = np.random.multivariate_normal(GP_mean(X_test), GP_kernel(X_test,X_test), size=50).T
 plt.figure()
