@@ -68,8 +68,8 @@ class GaussianProcess:
 
         return mean, kernal_N
 
-    def GP_on_grid(self, grid_points, num_evaluations=1):
-        """Returns a Gaussian Process evalued at the points"""
+    def GP_at_points(self, grid_points, num_evaluations=1):
+        """Returns a Gaussian Process evalued at the grid points"""
         return multivariate_normal(self.mean(grid_points), self.kernel(grid_points,grid_points),
                                     allow_singular=True, size=num_evaluations).T
 
@@ -109,31 +109,45 @@ class GaussianProcess:
 
         If u.shape = (m x d), v.shape = (n x d) then r2.shape = (m x n)
         If u.shape = (m,)     v.shape = (n x d) then r2.shape = (m x n)
+        If u.shape = (m x d), v.shape = (n,)    then r2.shape = (m x n)
         If u.shape = (m,)     v.shape = (n,)    then r2.shape = (m x n)
+        If u.shape = (d,)     v.shape = (d,)    then r2       = float
         If m or n = 1 then that dimension is squeezed out of r2.shape"""
 
         #First calculate vector/matrix of length of u-v
         dim_U = len(u.shape)
         dim_V = len(v.shape)
-        if (dim_U <= 1 and dim_V <= 1):
-            r2 = np.sum(np.square(u-v))
+        
+        #first bottom 2 cases
+        if (dim_U == 1 and dim_V == 1):
+            #if 4th case append axes to get correct shape
+            if u.shape[0] != v.shape[0]:
+                V = v[np.newaxis,:]
+                U = u[:,np.newaxis]
+                r2 = np.squeeze(np.square(U-V))
+            else:
+                r2 = np.sum(np.square(u-v))
         else:
+            #Always put a new axes on end of v and middle of u
             V = v[np.newaxis,:]
             U = u[:,np.newaxis]
             if dim_U == 1:
-                U = U.T
+                U = U[:,np.newaxis]
+            #move the new axis from the end of U to the middle
+            U = np.swapaxes(U,2,1)
+            if dim_V == 1:
+                V = V[:,np.newaxis]
             diff = U-V
             r2 = np.squeeze(np.einsum('ijk,ijk->ij',diff,diff))
         return r2
 
 
-
 #%% Testing Brownian Bridge code
-GP = GaussianProcess(np.array([0,2]),np.array([1,3]))
-points = np.array([0,0.5,1])
-data = np.array([0,0,1.])
-plt.figure()
-for i in range(30):
-    data[1] = GP.Brownian_bridge(points,data,0.5)
-    plt.plot(points, data)
-plt.show()
+#GP = GaussianProcess(np.array([0,2]),np.array([1,3]))
+#points = np.array([0,0.5,1])
+#data = np.array([0,0,1.])
+#plt.figure()
+#for i in range(30):
+#    data[1] = GP.Brownian_bridge(points,data,0.5)
+#    plt.plot(points, data)
+#plt.show()
