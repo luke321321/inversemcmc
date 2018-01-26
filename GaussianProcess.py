@@ -87,6 +87,7 @@ class GaussianProcess:
         
         Points: np array (x0, x, x1)
         Data: np array (f(x0), f(x1))"""
+        
         T = np.sqrt(self.r2_distance(points[0], points[2]))
         t = np.sqrt(self.r2_distance(points[0], points[1]))
         return data[0] + np.random.normal(scale=cor) + t/T *(data[2]-data[0])
@@ -114,11 +115,12 @@ class GaussianProcess:
         If u.shape = (d,)     v.shape = (d,)    then r2       = float
         If m or n = 1 then that dimension is squeezed out of r2.shape"""
 
-        #First calculate vector/matrix of length of u-v
+        #First check dimensions
         dim_U = len(u.shape)
         dim_V = len(v.shape)
+        assert 1 <= dim_U and dim_U <=2 and 1 <= dim_V and dim_V <=2
         
-        #first bottom 2 cases
+        #first bottom 2 cases from doc
         if (dim_U == 1 and dim_V == 1):
             #if 4th case append axes to get correct shape
             if u.shape[0] != v.shape[0]:
@@ -128,15 +130,14 @@ class GaussianProcess:
             else:
                 r2 = np.sum(np.square(u-v))
         else:
-            #Always put a new axes on end of v and middle of u
-            V = v[np.newaxis,:]
-            U = u[:,np.newaxis]
+            #Always put a new axes at start of v and middle of u
+            V = v[np.newaxis,...]
             if dim_U == 1:
-                U = U[:,np.newaxis]
-            #move the new axis from the end of U to the middle
-            U = np.swapaxes(U,2,1)
+                U = u[:, np.newaxis, np.newaxis]
+            else:
+                U = u[:, np.newaxis, :]
             if dim_V == 1:
-                V = V[:,np.newaxis]
+                V = V[...,np.newaxis]
             diff = U-V
             r2 = np.squeeze(np.einsum('ijk,ijk->ij',diff,diff))
         return r2

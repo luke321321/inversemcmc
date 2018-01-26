@@ -9,30 +9,36 @@ import numpy as np
 import hypothesis.strategies as st
 from hypothesis import given, assume
 from hypothesis.extra.numpy import arrays, array_shapes
-from hypothesis.strategies import floats
 
 from GaussianProcess import GaussianProcess
   
-dist_array = arrays(np.float64, array_shapes(2,2,1,100), elements=floats(min_value=-1e30, max_value=1e30)) 
-@given(dist_array, dist_array, dist_array)
-def test_r2_distance(x, y, z):
+
+
+vec = arrays(np.float64, array_shapes(1,1,1,100), elements=st.floats(min_value=-1e15, max_value=1e15)) 
+mixed = arrays(np.float64, array_shapes(1,2,2,100), elements=st.floats(min_value=-1e15, max_value=1e15)) 
+
+@given(st.data())
+def test_r2_distance_list_vectors(data):
+    #draw both x and y so that have shapes (m x d) and (n x d) respectively
+    d = data.draw(st.integers(1,100), 'd')
+    strat_array = arrays(np.float64, (10, d), elements=st.floats(min_value=-1e5, max_value=1e5)) 
+    x = data.draw(strat_array, 'x')
+    y = data.draw(strat_array, 'y')
+
+    test_r2_distance_tests(x, y)
+
+@given(vec , vec)
+def test_r2_distance_vectors(x, y):
+    test_r2_distance_tests(x, y)
+    
+@given(vec , mixed)
+def test_r2_distance_mixed(x, y):
+    test_r2_distance_tests(x, y)
+        
+def test_r2_distance_tests(x, y):
     GP = GaussianProcess(np.array([0,1]), np.array([0,1]))
-    
-    #if dim x,y > 1 then need x.shape[1] == y.shape[1]
-    if len(x.shape) > 1 and len(y.shape) > 1:
-        assume(x.shape[1] == y.shape[1])
-    if len(x.shape) > 1 and len(z.shape) > 1:
-        assume(x.shape[1] == z.shape[1])
-    if len(y.shape) > 1 and len(z.shape) > 1:
-        assume(y.shape[1] == z.shape[1])
-    
-    d_xy = GP.r2_distance(x,y)
-    d_yx = GP.r2_distance(y,x)
-    d_xz = GP.r2_distance(x,z)
-    d_zy = GP.r2_distance(z,y)
-    
-    #check triangle inequality
-    assert np.amax(np.sqrt(d_xy)) <= np.amax(np.sqrt(d_xz)) + np.amax(np.sqrt(d_zy))
+    d_xy = GP.r2_distance(x ,y)
+    d_yx = GP.r2_distance(y, x)
     
     #Check symmetry
     assert np.array_equiv(d_xy, d_yx.T)
@@ -48,4 +54,6 @@ def test_r2_distance(x, y, z):
         assert (d_xx.diagonal() == 0).all()
     
 if __name__ == '__main__':
-    test_r2_distance()
+    test_r2_distance_list_vectors()
+    test_r2_distance_vectors()
+    test_r2_distance_mixed()
