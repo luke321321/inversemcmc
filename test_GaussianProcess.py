@@ -12,7 +12,11 @@ from hypothesis.extra.numpy import arrays, array_shapes
 
 from GaussianProcess import GaussianProcess
   
-
+def test_r2_distance():
+    test_r2_distance_list_vectors()
+    test_r2_distance_vectors()
+    test_r2_distance_mixed()
+    test_r2_distance_floats()
 
 vec = arrays(np.float64, array_shapes(1,1,1,100), elements=st.floats(min_value=-1e15, max_value=1e15)) 
 mixed = arrays(np.float64, array_shapes(1,2,2,100), elements=st.floats(min_value=-1e15, max_value=1e15)) 
@@ -34,6 +38,10 @@ def test_r2_distance_vectors(x, y):
 @given(vec , mixed)
 def test_r2_distance_mixed(x, y):
     test_r2_distance_tests(x, y)
+    
+@given(vec , mixed)
+def test_r2_distance_floats(x, y):
+    test_r2_distance_tests(x[0], y)
         
 def test_r2_distance_tests(x, y):
     GP = GaussianProcess(np.array([0,1]), np.array([0,1]))
@@ -41,7 +49,7 @@ def test_r2_distance_tests(x, y):
     d_yx = GP.r2_distance(y, x)
     
     #Check symmetry
-    assert np.array_equiv(d_xy, d_yx.T)
+    assert np.array_equiv(d_xy, d_yx.T) or np.array_equiv(d_xy, d_yx)
     
     #check d(x,0) = 0 iff x = 0
     assert (GP.r2_distance(x, np.zeros(x.shape)) == 0).all() == (np.sum(np.abs(x)) == 0)
@@ -54,6 +62,4 @@ def test_r2_distance_tests(x, y):
         assert (d_xx.diagonal() == 0).all()
     
 if __name__ == '__main__':
-    test_r2_distance_list_vectors()
-    test_r2_distance_vectors()
-    test_r2_distance_mixed()
+    test_r2_distance()

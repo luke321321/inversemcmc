@@ -118,10 +118,15 @@ class GaussianProcess:
         #First check dimensions
         dim_U = len(u.shape)
         dim_V = len(v.shape)
-        assert 1 <= dim_U and dim_U <=2 and 1 <= dim_V and dim_V <=2
+        assert dim_U <=2 and dim_V <=2
         
-        #first bottom 2 cases from doc
-        if (dim_U == 1 and dim_V == 1):
+        #first bottom 3 cases from doc
+        
+        #deal with floats sensibly
+        if dim_U == 0 or dim_V == 0:
+            diff = u-v
+            r2 = np.square(diff)
+        elif (dim_U == 1 and dim_V == 1):
             #if 4th case append axes to get correct shape
             if u.shape[0] != v.shape[0]:
                 V = v[np.newaxis,:]
