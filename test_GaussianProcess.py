@@ -44,18 +44,17 @@ def test_r2_distance_floats(x, y):
     test_r2_distance_tests(x[0], y)
         
 def test_r2_distance_tests(x, y):
-    GP = GaussianProcess(np.array([0,1]), np.array([0,1]))
-    d_xy = GP.r2_distance(x ,y)
-    d_yx = GP.r2_distance(y, x)
+    d_xy = GaussianProcess.r2_distance(x ,y)
+    d_yx = GaussianProcess.r2_distance(y, x)
     
     #Check symmetry
     assert np.array_equiv(d_xy, d_yx.T) or np.array_equiv(d_xy, d_yx)
     
     #check d(x,0) = 0 iff x = 0
-    assert (GP.r2_distance(x, np.zeros(x.shape)) == 0).all() == (np.sum(np.abs(x)) == 0)
+    assert (GaussianProcess.r2_distance(x, np.zeros(x.shape)) == 0).all() == (np.sum(np.abs(x)) == 0)
     
     #d(x,x) == 0
-    d_xx = GP.r2_distance(x, x)
+    d_xx = GaussianProcess.r2_distance(x, x)
     if len(d_xx.shape) <= 1:
         assert (d_xx == 0).all()
     else:

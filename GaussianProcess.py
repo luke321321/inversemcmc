@@ -10,39 +10,44 @@ from scipy.special import gamma, kv
 from scipy.stats import multivariate_normal
 from scipy.interpolate import RegularGridInterpolator, interp1d
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
 class GaussianProcess:
     def __init__(self, design_points, data, nu=1/2, sig2 = 1, lam = 1):
-        """Initialises a Guassian Emulator with the kernel being a Matern Kernal.
-        Defaults: to exponential kernal
+        """Initialises a Guassian Emulator with the kernel being a Matern kernel.
+        Defaults: to exponential kernel
         Gaussian: nu = np.inf
         Exp: nu = 1/2
         """
 
-        #if the design_points are 1d append empty axis for r2_distance method
+        #if the design_points are 1d: sort them and append empty axis for r2_distance method
         if len(design_points.shape) == 1:
-            self.design_points = design_points[:,np.newaxis]
+            index_array = np.argsort(design_points)
+            self.design_points = design_points[index_array, np.newaxis]
+            self.data = data[index_array]
         else:
             self.design_points = design_points
+            self.data = data
 
-        self.data = data
         self.nu = nu
         self.sig2 = sig2
         self.lam = lam
-        self.mean, self.kernal = self.create_matern()
+        self.dim = self.design_points.shape[1]
+        
+        self.mean, self.kernel = self.create_matern()
 
     def create_matern(self):
-        """Creates a Guassian Emulator with the kernel being a Matern Kernal.
-        Returns functions mean(u), kernal_N(u,v)
+        """Creates a Guassian Emulator with the kernel being a Matern kernel.
+        Returns functions mean(u), kernel_N(u,v)
 
-        Note for functions mean(u), kernal_N(u,v)
+        Note for functions mean(u), kernel_N(u,v)
         If u.shape = (4,1) then u is an array of 1d points, if u.shape = (4,) then u is a vector
         and the same for v
         """
         phiStar = self.data
 
-        def k(self, u, v):
-            r2 = self.r2_distance(u,v)
+        def k(u, v):
+            r2 = GaussianProcess.r2_distance(u,v)
 
             if self.nu == np.inf:
                 return np.exp(-r2)
@@ -50,58 +55,81 @@ class GaussianProcess:
                 return self.sig2*np.exp(-np.sqrt(r2)/self.lam)
             else:
                 rt2_nu = math.sqrt(2*self.nu)/self.lam
-                const = (self.sig2/gamma(self.nu)*math.pow(2,self.nu-1))
-                kuv = const*np.power(rt2_nu*r2,self.nu)*kv(self.nu,rt2_nu*r2)
+                const = (self.sig2/gamma(self.nu)*math.pow(2, self.nu-1))
+                kuv = const*np.power(rt2_nu*r2, self.nu)*kv(self.nu, rt2_nu*r2)
 
-                #if r2[i,j] = 0 then want kernalStar[i,j] = 1
+                #if r2[i,j] = 0 then want kernelStar[i,j] = 1
                 #Asymptotics when r2 = 0 not the best
                 where_NaNs = np.isnan(kuv)
                 kuv[where_NaNs] = 1
                 return kuv
 
-        kernel_star_inverse = np.linalg.inv(k(self,self.design_points, self.design_points))
+        kernel_star_inverse = np.linalg.inv(k(self.design_points, self.design_points))
         kernel_star_inverse_dot_phi_star = kernel_star_inverse @ phiStar
 
-        mean = lambda u : k(self,u, self.design_points) @ kernel_star_inverse_dot_phi_star
-        kernal_N = lambda u,v: (k(self,u,v) - k(self,v, self.design_points) @ kernel_star_inverse
-                                @ k(self, u, self.design_points).T)
+        mean = lambda u : k(u, self.design_points) @ kernel_star_inverse_dot_phi_star
+        kernel_N = lambda u,v: (k(u, v) - k(v, self.design_points) @ kernel_star_inverse
+                                @ k(u, self.design_points).T)
 
-        return mean, kernal_N
+        return mean, kernel_N
 
     def GP_at_points(self, grid_points, num_evaluations=1):
         """Returns a Gaussian Process evalued at the grid points"""
-        return multivariate_normal(self.mean(grid_points), self.kernel(grid_points,grid_points),
-                                    allow_singular=True, size=num_evaluations).T
+        return multivariate_normal(self.mean(grid_points), self.kernel(grid_points, grid_points), allow_singular=True).rvs(size=num_evaluations).T
 
     def GP(self, num_grid_points, interp_method='linear', num_evaluations=1):
         if interp_method == 'linear':
             return self.GP_interp_linear(num_grid_points, num_evaluations)
+        else:
+            raise Exception('Not yet implemented')
 
-    def GP_interp_linear(self, num_grid_points, num_evaluations):
+    def GP_interp_linear(self, num_grid_points, num_evaluations=1):
         """Returns a function that is a GP evaluated exactly at the grid points
-        and used linear intepolation to evaluate it at other points"""
-
-    def Brownian_bridge(self, points, data, cor):
+        and uses linear intepolation to evaluate it at other points
+        
+        The returned function is really a vector of functions of size num_evaluations
+        """
+        #TODO: only currently returns 1 evaluation of the GP
+        if num_evaluations != 1:
+            raise Exception('Not yet implemented')
+        dp_min = np.amin(self.design_points)
+        dp_max = np.amax(self.design_points)
+        grid = self.create_uniform_grid(dp_min, dp_max, num_grid_points, self.dim)
+        if self.dim == 1:
+#            grid = self.create_uniform_grid(dp_min, dp_max, num_grid_points, self.dim)
+            return interp1d(grid.squeeze(), self.GP_at_points(grid).squeeze(), copy=False, assume_sorted=True)
+        else:
+            #reshape grid and data to fit the interpolator
+            grid_points_grid = [np.linspace(dp_min, dp_max, num_grid_points) for _ in range(self.dim)]
+            GP_eval = self.GP_at_points(grid).reshape(num_grid_points, num_grid_points)
+            return RegularGridInterpolator(grid_points_grid, GP_eval)
+        
+    @staticmethod
+    def Brownian_bridge(points, data, cor):
         """Uses a Brownian bridge to interpolate a function at x given
         value at two points x_0 and x_1.
         
         Points: np array (x0, x, x1)
         Data: np array (f(x0), f(x1))"""
         
-        T = np.sqrt(self.r2_distance(points[0], points[2]))
-        t = np.sqrt(self.r2_distance(points[0], points[1]))
+        T = np.sqrt(GaussianProcess.r2_distance(points[0], points[2]))
+        t = np.sqrt(GaussianProcess.r2_distance(points[0], points[1]))
         return data[0] + np.random.normal(scale=cor) + t/T *(data[2]-data[0])
 
-
-    def create_uniform_grid(self, min_range, max_range, n, dim):
+    @staticmethod
+    def create_uniform_grid(min_range, max_range, n, dim=1):
+        """Creates a uniform grid with n points in each dimension on 
+        [min_range, max_range]^dim"""
+        
         if dim > 1:
-            grid_points_grid = np.meshgrid(*[np.linspace(min_range,max_range,n) for _ in range(dim)])
-            grid_points = np.hstack(grid_points_grid).swapaxes(0,1).reshape(dim,-1).T
+            grid_points_grid = np.meshgrid(*[np.linspace(min_range, max_range, n) for _ in range(dim)])
+            grid_points = np.hstack(grid_points_grid).swapaxes(0, 1).reshape(dim, -1).T
         else:
-            grid_points = np.linspace(min_range, max_range, n)[:,np.newaxis]
+            grid_points = np.linspace(min_range, max_range, n)[:, np.newaxis]
         return grid_points
-
-    def r2_distance(self, u, v):
+    
+    @staticmethod
+    def r2_distance(u, v):
         """Calculates the l^2 distance squared between u and v for u,v being points,
         vectors or list of vectors and returns a point, vector or matrix as appropriate.
         Dimensions of the vectors has to be the same
@@ -119,9 +147,7 @@ class GaussianProcess:
         dim_U = len(u.shape)
         dim_V = len(v.shape)
         assert dim_U <=2 and dim_V <=2
-        
-        #first bottom 3 cases from doc
-        
+              
         #deal with floats sensibly
         if dim_U == 0 or dim_V == 0:
             diff = u-v
@@ -142,18 +168,58 @@ class GaussianProcess:
             else:
                 U = u[:, np.newaxis, :]
             if dim_V == 1:
-                V = V[...,np.newaxis]
+                V = V[..., np.newaxis]
             diff = U-V
-            r2 = np.squeeze(np.einsum('ijk,ijk->ij',diff,diff))
+            r2 = np.squeeze(np.einsum('ijk,ijk->ij', diff, diff))
         return r2
 
 
 #%% Testing Brownian Bridge code
-#GP = GaussianProcess(np.array([0,2]),np.array([1,3]))
 #points = np.array([0,0.5,1])
 #data = np.array([0,0,1.])
 #plt.figure()
 #for i in range(30):
-#    data[1] = GP.Brownian_bridge(points,data,0.5)
+#    data[1] = GaussianProcess.Brownian_bridge(points,data,0.5)
 #    plt.plot(points, data)
 #plt.show()
+        
+    
+#%% Testing Gaussian Process interpolation for 1d
+#design_pts = GaussianProcess.create_uniform_grid(-2,2,10)
+#obs = np.random.normal(size = 10)
+#GP1 = GaussianProcess(design_pts, obs)
+#GP_interp_method = GP1.GP(100)
+#vGP_interp_method = np.vectorize(GP_interp_method)
+##Plot results:
+#plt.figure()
+#plt.plot(design_pts, obs, 'ro')
+#grid = GaussianProcess.create_uniform_grid(-2,2,1000)
+#plt.plot(grid, vGP_interp_method(grid))
+#plt.show()
+
+#%% Testing Gaussian Process interpolation for 2d
+design_pts = GaussianProcess.create_uniform_grid(-2,2,10,2)
+obs = np.random.normal(size = 10 ** 2)
+GP1 = GaussianProcess(design_pts, obs)
+GP_interp_method = GP1.GP(50)
+vGP_interp_method = np.vectorize(GP_interp_method, signature='(i)->()')
+
+#Plot results dim:
+#for i in range(2):
+#    plt.figure()
+#    plt.plot(design_pts[:, i-1], obs, 'ro')
+#    grid = GaussianProcess.create_uniform_grid(-2,2,250,2)
+#    plt.plot(grid[:, i-1], vGP_interp_method(grid))
+#    plt.show()
+
+fig = plt.figure()
+ax = fig.gca(projection='3d')
+
+X = np.linspace(-2, 2, 250)
+Y = np.linspace(-2, 2, 250)
+Z = GaussianProcess.create_uniform_grid(-2,2,250,2)
+#Plot the surface
+ax.plot_trisurf(X, Y, vGP_interp_method(Z), antialiased=True)
+#Plot the design points
+ax.scatter(design_pts[:,0], design_pts[:,1], obs, color='green')
+plt.show()
