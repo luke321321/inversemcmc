@@ -67,10 +67,10 @@ class GaussianProcess:
         kernel_star_inverse_dot_phi_star = kernel_star_inverse @ phiStar
 
         mean = lambda u : k(u, self.design_points) @ kernel_star_inverse_dot_phi_star
-        kernel_N = lambda u,v: (k(u, v) - k(v, self.design_points) @ kernel_star_inverse
+        kernel = lambda u,v: (k(u, v) - k(v, self.design_points) @ kernel_star_inverse
                                 @ k(u, self.design_points).T)
 
-        return mean, kernel_N
+        return mean, kernel
 
     def GP_at_points(self, grid_points, num_evaluations=1):
         """Returns a Gaussian Process evalued at the grid points"""

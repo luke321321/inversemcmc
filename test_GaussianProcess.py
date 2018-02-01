@@ -108,7 +108,7 @@ def test_GP_interp_2d(plotFlag = True):
         plt.show()
     
 if __name__ == '__main__':
-    test_r2_distance()
+#    test_r2_distance()
 #    test_brownian_bridge()
 #    test_GP_interp_1d()
-#    test_GP_interp_2d()
+    test_GP_interp_2d()
