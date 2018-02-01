@@ -9,6 +9,8 @@ import numpy as np
 import hypothesis.strategies as st
 from hypothesis import given, assume
 from hypothesis.extra.numpy import arrays, array_shapes
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
 from GaussianProcess import GaussianProcess
   
@@ -59,6 +61,52 @@ def test_r2_distance_tests(x, y):
         assert (d_xx == 0).all()
     else:
         assert (d_xx.diagonal() == 0).all()
+        
+def test_brownian_bridge():
+    points = np.array([0,0.5,1])
+    data = np.array([0,0,1.])
+    plt.figure()
+    for i in range(30):
+        data[1] = GaussianProcess.Brownian_bridge(points,data,0.5)
+        plt.plot(points, data)
+    plt.show()
+        
+
+def test_GP_interp_1d():
+    design_pts = GaussianProcess.create_uniform_grid(-2,2,10)
+    obs = np.random.normal(size = 10)
+    GP1 = GaussianProcess(design_pts, obs)
+    GP_interp_method = GP1.GP(100)
+    vGP_interp_method = np.vectorize(GP_interp_method)
+    
+    #Plot results:
+    plt.figure()
+    plt.plot(design_pts, obs, 'ro')
+    grid = GaussianProcess.create_uniform_grid(-2,2,1000)
+    plt.plot(grid, vGP_interp_method(grid))
+    plt.show()
+
+def test_GP_interp_2d():
+    design_pts = GaussianProcess.create_uniform_grid(-2,2,5,2)
+    obs = np.random.randn(5 ** 2)
+    GP1 = GaussianProcess(design_pts, obs)
+    GP_interp_method = GP1.GP(25)
+    vGP_interp_method = np.vectorize(GP_interp_method, signature='(i)->()')
+    
+    #Plot results:
+    fig = plt.figure()
+    ax = fig.gca(projection='3d')
+    Z = GaussianProcess.create_uniform_grid(-2,2,50,2)
+    X = Z[:,0]
+    Y = Z[:,1]
+    #Plot the surface
+    ax.plot_trisurf(X, Y, vGP_interp_method(Z)) #, antialiased=True
+    #Plot the design points
+    ax.scatter(design_pts[:,0], design_pts[:,1], obs, color='green')
+    plt.show()
     
 if __name__ == '__main__':
     test_r2_distance()
+#    test_brownian_bridge()
+#    test_GP_interp_1d()
+#    test_GP_interp_2d()

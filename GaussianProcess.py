@@ -96,10 +96,9 @@ class GaussianProcess:
         dp_max = np.amax(self.design_points)
         grid = self.create_uniform_grid(dp_min, dp_max, num_grid_points, self.dim)
         if self.dim == 1:
-#            grid = self.create_uniform_grid(dp_min, dp_max, num_grid_points, self.dim)
             return interp1d(grid.squeeze(), self.GP_at_points(grid).squeeze(), copy=False, assume_sorted=True)
         else:
-            #reshape grid and data to fit the interpolator
+            #reshape grid and data to fit the interpolator method
             grid_points_grid = [np.linspace(dp_min, dp_max, num_grid_points) for _ in range(self.dim)]
             GP_eval = self.GP_at_points(grid).reshape(num_grid_points, num_grid_points)
             return RegularGridInterpolator(grid_points_grid, GP_eval)
@@ -172,54 +171,3 @@ class GaussianProcess:
             diff = U-V
             r2 = np.squeeze(np.einsum('ijk,ijk->ij', diff, diff))
         return r2
-
-
-#%% Testing Brownian Bridge code
-#points = np.array([0,0.5,1])
-#data = np.array([0,0,1.])
-#plt.figure()
-#for i in range(30):
-#    data[1] = GaussianProcess.Brownian_bridge(points,data,0.5)
-#    plt.plot(points, data)
-#plt.show()
-        
-    
-#%% Testing Gaussian Process interpolation for 1d
-#design_pts = GaussianProcess.create_uniform_grid(-2,2,10)
-#obs = np.random.normal(size = 10)
-#GP1 = GaussianProcess(design_pts, obs)
-#GP_interp_method = GP1.GP(100)
-#vGP_interp_method = np.vectorize(GP_interp_method)
-##Plot results:
-#plt.figure()
-#plt.plot(design_pts, obs, 'ro')
-#grid = GaussianProcess.create_uniform_grid(-2,2,1000)
-#plt.plot(grid, vGP_interp_method(grid))
-#plt.show()
-
-#%% Testing Gaussian Process interpolation for 2d
-design_pts = GaussianProcess.create_uniform_grid(-2,2,10,2)
-obs = np.random.normal(size = 10 ** 2)
-GP1 = GaussianProcess(design_pts, obs)
-GP_interp_method = GP1.GP(50)
-vGP_interp_method = np.vectorize(GP_interp_method, signature='(i)->()')
-
-#Plot results dim:
-#for i in range(2):
-#    plt.figure()
-#    plt.plot(design_pts[:, i-1], obs, 'ro')
-#    grid = GaussianProcess.create_uniform_grid(-2,2,250,2)
-#    plt.plot(grid[:, i-1], vGP_interp_method(grid))
-#    plt.show()
-
-fig = plt.figure()
-ax = fig.gca(projection='3d')
-
-X = np.linspace(-2, 2, 250)
-Y = np.linspace(-2, 2, 250)
-Z = GaussianProcess.create_uniform_grid(-2,2,250,2)
-#Plot the surface
-ax.plot_trisurf(X, Y, vGP_interp_method(Z), antialiased=True)
-#Plot the design points
-ax.scatter(design_pts[:,0], design_pts[:,1], obs, color='green')
-plt.show()

@@ -314,7 +314,7 @@ if flag_run_MCMC:
 
 #%% Plotting
 #Plotting phi and GP of phi:
-flag_plot = 0
+flag_plot = 1
 if flag_plot:      
     #Vectorise GP for plotting
     vGP = np.vectorize(lambda u: GP_mean(u), signature='(i)->()')
