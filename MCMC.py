@@ -216,9 +216,9 @@ max_range = 1
 #need above 1000
 num_obs = 1
 #number basis functions for solving PDE
-N=10**3
+N = 10 ** 3
 #point to solve PDE at
-x=0.45
+x = 0.45
 
 #Generate data
 #The truth u_dagger lives in [-1,0.5]

@@ -7,7 +7,6 @@ Created on Thu Jan 18 11:30:39 2018
 import numpy as np
 import math
 from scipy.special import gamma, kv
-from scipy.stats import multivariate_normal
 from scipy.interpolate import RegularGridInterpolator, interp1d
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -75,7 +74,7 @@ class GaussianProcess:
 
     def GP_at_points(self, grid_points, num_evaluations=1):
         """Returns a Gaussian Process evalued at the grid points"""
-        return multivariate_normal(self.mean(grid_points), self.kernel(grid_points, grid_points), allow_singular=True).rvs(size=num_evaluations).T
+        return np.random.multivariate_normal(self.mean(grid_points), self.kernel(grid_points, grid_points))
 
     def GP(self, num_grid_points, interp_method='linear', num_evaluations=1):
         if interp_method == 'linear':
@@ -140,7 +139,10 @@ class GaussianProcess:
         If u.shape = (m x d), v.shape = (n,)    then r2.shape = (m x n)
         If u.shape = (m,)     v.shape = (n,)    then r2.shape = (m x n)
         If u.shape = (d,)     v.shape = (d,)    then r2       = float
-        If m or n = 1 then that dimension is squeezed out of r2.shape"""
+        If m or n = 1 then that dimension is squeezed out of r2.shape
+        
+        Downside to this method is that it uses a lot of memory
+         - creates diff which is (m x n x d) array"""
 
         #First check dimensions
         dim_U = len(u.shape)

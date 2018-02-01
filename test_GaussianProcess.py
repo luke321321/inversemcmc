@@ -72,7 +72,7 @@ def test_brownian_bridge():
     plt.show()
         
 
-def test_GP_interp_1d():
+def test_GP_interp_1d(plotFlag = True):
     design_pts = GaussianProcess.create_uniform_grid(-2,2,10)
     obs = np.random.normal(size = 10)
     GP1 = GaussianProcess(design_pts, obs)
@@ -80,13 +80,14 @@ def test_GP_interp_1d():
     vGP_interp_method = np.vectorize(GP_interp_method)
     
     #Plot results:
-    plt.figure()
-    plt.plot(design_pts, obs, 'ro')
-    grid = GaussianProcess.create_uniform_grid(-2,2,1000)
-    plt.plot(grid, vGP_interp_method(grid))
-    plt.show()
+    if plotFlag:
+        plt.figure()
+        plt.plot(design_pts, obs, 'ro')
+        grid = GaussianProcess.create_uniform_grid(-2,2,1000)
+        plt.plot(grid, vGP_interp_method(grid))
+        plt.show()
 
-def test_GP_interp_2d():
+def test_GP_interp_2d(plotFlag = True):
     design_pts = GaussianProcess.create_uniform_grid(-2,2,5,2)
     obs = np.random.randn(5 ** 2)
     GP1 = GaussianProcess(design_pts, obs)
@@ -94,16 +95,17 @@ def test_GP_interp_2d():
     vGP_interp_method = np.vectorize(GP_interp_method, signature='(i)->()')
     
     #Plot results:
-    fig = plt.figure()
-    ax = fig.gca(projection='3d')
-    Z = GaussianProcess.create_uniform_grid(-2,2,50,2)
-    X = Z[:,0]
-    Y = Z[:,1]
-    #Plot the surface
-    ax.plot_trisurf(X, Y, vGP_interp_method(Z)) #, antialiased=True
-    #Plot the design points
-    ax.scatter(design_pts[:,0], design_pts[:,1], obs, color='green')
-    plt.show()
+    if plotFlag:
+        fig = plt.figure()
+        ax = fig.gca(projection='3d')
+        Z = GaussianProcess.create_uniform_grid(-2,2,50,2)
+        X = Z[:,0]
+        Y = Z[:,1]
+        #Plot the surface
+        ax.plot_trisurf(X, Y, vGP_interp_method(Z)) #, antialiased=True
+        #Plot the design points
+        ax.scatter(design_pts[:,0], design_pts[:,1], obs, color='green')
+        plt.show()
     
 if __name__ == '__main__':
     test_r2_distance()
