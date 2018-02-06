@@ -72,24 +72,26 @@ class GaussianProcess:
 
         return mean, kernel
 
-    def GP_at_points(self, grid_points, num_evaluations=1):
+    def GP_at_points(self, grid_points, num_evals=1):
         """Returns a Gaussian Process evalued at the grid points"""
-        return np.random.multivariate_normal(self.mean(grid_points), self.kernel(grid_points, grid_points))
+        return np.random.multivariate_normal(self.mean(grid_points), self.kernel(grid_points, grid_points),
+                                             num_evals).T
 
-    def GP(self, num_grid_points, interp_method='linear', num_evaluations=1):
+    def GP(self, num_grid_points, interp_method='linear', num_evals=1):
         if interp_method == 'linear':
-            return self.GP_interp_linear(num_grid_points, num_evaluations)
+            return self.GP_interp_linear(num_grid_points, num_evals)
         else:
             raise Exception('Not yet implemented')
+        #TODO add Brownian bridge 'interpolation' method
 
-    def GP_interp_linear(self, num_grid_points, num_evaluations=1):
+    def GP_interp_linear(self, num_grid_points, num_evals=1):
         """Returns a function that is a GP evaluated exactly at the grid points
         and uses linear intepolation to evaluate it at other points
         
         The returned function is really a vector of functions of size num_evaluations
         """
         #TODO: only currently returns 1 evaluation of the GP
-        if num_evaluations != 1:
+        if num_evals != 1:
             raise Exception('Not yet implemented')
         dp_min = np.amin(self.design_points)
         dp_max = np.amax(self.design_points)

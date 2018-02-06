@@ -109,8 +109,22 @@ def test_GP_interp_2d(plotFlag = True):
         ax.scatter(design_pts[:,0], design_pts[:,1], obs, color='green')
         plt.show()
     
+def test_GP_samples_1d(plotFlag = True):
+    design_pts = GaussianProcess.create_uniform_grid(-2,2,5,1)
+    obs = np.random.randn(5)
+    GP1 = GaussianProcess(design_pts, obs)
+    grid = GaussianProcess.create_uniform_grid(-2,2,21,1)
+    realisation = GP1.GP_at_points(grid, num_evals=30)
+
+    if plotFlag:
+        plt.figure()
+        plt.plot(grid, realisation)
+        plt.plot(design_pts, obs, 'ro')
+        plt.show()
+        
 if __name__ == '__main__':
-    test_r2_distance()
+#    test_r2_distance()
 #    test_brownian_bridge()
 #    test_GP_interp_1d()
-    test_GP_interp_2d()
+#    test_GP_interp_2d()
+    test_GP_samples_1d()
