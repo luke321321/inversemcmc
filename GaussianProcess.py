@@ -139,15 +139,29 @@ class GaussianProcess:
         If u.shape = (m x d), v.shape = (n,)    then r2.shape = (m x n)
         If u.shape = (m,)     v.shape = (n,)    then r2.shape = (m x n)
         If u.shape = (d,)     v.shape = (d,)    then r2       = float
-        If m or n = 1 then that dimension is squeezed out of r2.shape
+        If m or n = 1 then that dimension is squeezed out of r2.shape"""
         
-        Downside to this method is that it uses a lot of memory
-         - creates diff which is (m x n x d) array"""
+        diff = None
+        mem_err = False
 
-        #First check dimensions
+        #First check dimensions and inputs
         dim_U = len(u.shape)
         dim_V = len(v.shape)
         assert dim_U <=2 and dim_V <=2
+        if dim_U == 2 and dim_V == 2:
+            assert u.shape[1] == v.shape[1]
+        
+        #Deal with large u and v incase of out of memory errors
+        if dim_U == 2 and dim_V == 2:
+            try:
+                diff = np.zeros((u.shape[0], v.shape[0], v.shape[1]))
+            except MemoryError:
+                mem_err = True
+                #try to sum a slower way instead without creating a large intermediate array
+                r2 = np.zeros((u.shape[0], v.shape[0]))
+                for i in range(u.shape[0]):
+                    for j in range(v.shape[0]):
+                        r2[i,j] = np.sum(np.square(u[i,:] - v[j,:]))
               
         #deal with floats sensibly
         if dim_U == 0 or dim_V == 0:
@@ -161,7 +175,7 @@ class GaussianProcess:
                 r2 = np.squeeze(np.square(U-V))
             else:
                 r2 = np.sum(np.square(u-v))
-        else:
+        elif mem_err == False:
             #Always put a new axes at start of v and middle of u
             V = v[np.newaxis,...]
             if dim_U == 1:
@@ -170,6 +184,12 @@ class GaussianProcess:
                 U = u[:, np.newaxis, :]
             if dim_V == 1:
                 V = V[..., np.newaxis]
-            diff = U-V
+            
+            #if diff has not already been allocated
+            if dim_U == 1 or dim_V == 1:
+                diff = U-V
+            else:
+                np.subtract(U,V,out=diff)
+            
             r2 = np.squeeze(np.einsum('ijk,ijk->ij', diff, diff))
         return r2

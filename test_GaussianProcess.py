@@ -7,43 +7,45 @@ Created on Wed Jan 24 11:33:32 2018
 
 import numpy as np
 import hypothesis.strategies as st
-from hypothesis import given, assume
+from hypothesis import given, assume, settings
 from hypothesis.extra.numpy import arrays, array_shapes
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
 from GaussianProcess import GaussianProcess
-  
+
 def test_r2_distance():
     test_r2_distance_list_vectors()
     test_r2_distance_vectors()
     test_r2_distance_mixed()
     test_r2_distance_floats()
 
-vec = arrays(np.float64, array_shapes(1,1,1,100), elements=st.floats(min_value=-1e15, max_value=1e15)) 
-mixed = arrays(np.float64, array_shapes(1,2,2,100), elements=st.floats(min_value=-1e15, max_value=1e15)) 
+vec = arrays(np.float64, array_shapes(1,1,1,500), elements=st.floats(min_value=-1e15, max_value=1e15)) 
+mixed = arrays(np.float64, array_shapes(1,2,2,500), elements=st.floats(min_value=-1e15, max_value=1e15)) 
 
-@given(st.data())
-def test_r2_distance_list_vectors(data):
-    #draw both x and y so that have shapes (m x d) and (n x d) respectively
-    d = data.draw(st.integers(1,100), 'd')
-    strat_array = arrays(np.float64, (10, d), elements=st.floats(min_value=-1e5, max_value=1e5)) 
-    x = data.draw(strat_array, 'x')
-    y = data.draw(strat_array, 'y')
-
-    test_r2_distance_tests(x, y)
-
-@given(vec , vec)
-def test_r2_distance_vectors(x, y):
-    test_r2_distance_tests(x, y)
+#Allow more time for these tests
+with settings(deadline=None):
+    @given(st.data())
+    def test_r2_distance_list_vectors(data):
+        #draw both x and y so that have shapes (m x d) and (n x d) respectively
+        d = data.draw(st.integers(1,100), 'd')
+        strat_array = arrays(np.float64, (10, d), elements=st.floats(min_value=-1e5, max_value=1e5)) 
+        x = data.draw(strat_array, 'x')
+        y = data.draw(strat_array, 'y')
     
-@given(vec , mixed)
-def test_r2_distance_mixed(x, y):
-    test_r2_distance_tests(x, y)
+        test_r2_distance_tests(x, y)
     
-@given(vec , mixed)
-def test_r2_distance_floats(x, y):
-    test_r2_distance_tests(x[0], y)
+    @given(vec , vec)
+    def test_r2_distance_vectors(x, y):
+        test_r2_distance_tests(x, y)
+        
+    @given(vec , mixed)
+    def test_r2_distance_mixed(x, y):
+        test_r2_distance_tests(x, y)
+        
+    @given(vec , mixed)
+    def test_r2_distance_floats(x, y):
+        test_r2_distance_tests(x[0], y)
         
 def test_r2_distance_tests(x, y):
     d_xy = GaussianProcess.r2_distance(x ,y)
@@ -108,7 +110,7 @@ def test_GP_interp_2d(plotFlag = True):
         plt.show()
     
 if __name__ == '__main__':
-#    test_r2_distance()
+    test_r2_distance()
 #    test_brownian_bridge()
 #    test_GP_interp_1d()
     test_GP_interp_2d()
