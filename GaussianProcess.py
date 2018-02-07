@@ -145,8 +145,13 @@ class GaussianProcess:
         
         diff = None
         mem_err = False
+        
+        #First deal with floats sensibly and return
+        if isinstance(u, (int, float)) or isinstance(v, (int, float)):
+            r2 = np.squeeze(np.square(u-v))
+            return r2
 
-        #First check dimensions and inputs
+        #Now check dimensions and inputs
         dim_U = len(u.shape)
         dim_V = len(v.shape)
         assert dim_U <=2 and dim_V <=2
@@ -164,12 +169,8 @@ class GaussianProcess:
                 for i in range(u.shape[0]):
                     for j in range(v.shape[0]):
                         r2[i,j] = np.sum(np.square(u[i,:] - v[j,:]))
-              
-        #deal with floats sensibly
-        if dim_U == 0 or dim_V == 0:
-            diff = u-v
-            r2 = np.square(diff)
-        elif (dim_U == 1 and dim_V == 1):
+        
+        if (dim_U == 1 and dim_V == 1):
             #if 4th case append axes to get correct shape
             if u.shape[0] != v.shape[0]:
                 V = v[np.newaxis,:]
