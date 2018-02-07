@@ -74,8 +74,12 @@ class GaussianProcess:
 
     def GP_at_points(self, grid_points, num_evals=1):
         """Returns a Gaussian Process evalued at the grid points"""
-        return np.random.multivariate_normal(self.mean(grid_points), self.kernel(grid_points, grid_points),
-                                             num_evals).T
+        val = np.random.multivariate_normal(self.mean(grid_points), self.kernel(grid_points, grid_points),
+                                             num_evals)
+        if num_evals > 1:
+            return val.T
+        else:
+            return val
 
     def GP(self, num_grid_points, interp_method='linear', num_evals=1):
         if interp_method == 'linear':
@@ -137,15 +141,12 @@ class GaussianProcess:
         Note if u.shape = (4,1) then u is an array of 1d points, if u.shape = (4,) then u is a vector.
 
         If u.shape = (m x d), v.shape = (n x d) then r2.shape = (m x n)
-        If u.shape = (m,)     v.shape = (n x d) then r2.shape = (m x n)
-        If u.shape = (m x d), v.shape = (n,)    then r2.shape = (m x n)
+        If u.shape = (d,)     v.shape = (n x d) then r2.shape = (n)
+        If u.shape = (m x d), v.shape = (d,)    then r2.shape = (m)
         If u.shape = (m,)     v.shape = (n,)    then r2.shape = (m x n)
         If u.shape = (d,)     v.shape = (d,)    then r2       = float
         If m or n = 1 then that dimension is squeezed out of r2.shape"""
-        
-        diff = None
-        mem_err = False
-        
+                
         #First deal with floats sensibly and return
         if isinstance(u, (int, float)) or isinstance(v, (int, float)):
             r2 = np.squeeze(np.square(u-v))
@@ -154,23 +155,16 @@ class GaussianProcess:
         #Now check dimensions and inputs
         dim_U = len(u.shape)
         dim_V = len(v.shape)
-        assert dim_U <=2 and dim_V <=2
+        
+        assert dim_U <= 2 and dim_V <= 2
         if dim_U == 2 and dim_V == 2:
             assert u.shape[1] == v.shape[1]
+        elif dim_U == 1 and dim_V == 2:
+            assert u.shape[0] == v.shape[1]
+        elif dim_U == 2 and dim_V == 1:
+            assert u.shape[1] == v.shape[0]
         
-        #Deal with large u and v incase of out of memory errors
-        if dim_U == 2 and dim_V == 2:
-            try:
-                diff = np.zeros((u.shape[0], v.shape[0], v.shape[1]))
-            except MemoryError:
-                mem_err = True
-                #try to sum a slower way instead without creating a large intermediate array
-                r2 = np.zeros((u.shape[0], v.shape[0]))
-                for i in range(u.shape[0]):
-                    for j in range(v.shape[0]):
-                        r2[i,j] = np.sum(np.square(u[i,:] - v[j,:]))
-        
-        if (dim_U == 1 and dim_V == 1):
+        if dim_U == 1 and dim_V == 1:
             #if 4th case append axes to get correct shape
             if u.shape[0] != v.shape[0]:
                 V = v[np.newaxis,:]
@@ -178,21 +172,22 @@ class GaussianProcess:
                 r2 = np.squeeze(np.square(U-V))
             else:
                 r2 = np.sum(np.square(u-v))
-        elif mem_err == False:
-            #Always put a new axes at start of v and middle of u
-            V = v[np.newaxis,...]
-            if dim_U == 1:
-                U = u[:, np.newaxis, np.newaxis]
-            else:
+        elif dim_U < 2 or dim_V < 2:
+            #cases 3 and 4, make u have the smallest dimension
+            if dim_U > dim_V:
+                u,v = v,u
+            u = u[np.newaxis, :]
+            r2 = np.sum(np.square(u-v), 1)
+        else:
+            #Deal with large u and v incase of out of memory errors
+            try:
                 U = u[:, np.newaxis, :]
-            if dim_V == 1:
-                V = V[..., np.newaxis]
-            
-            #if diff has not already been allocated
-            if dim_U == 1 or dim_V == 1:
-                diff = U-V
-            else:
-                np.subtract(U,V,out=diff)
-            
-            r2 = np.squeeze(np.einsum('ijk,ijk->ij', diff, diff))
+                V = v[np.newaxis,...]
+                r2 = np.squeeze(np.sum(np.square(U-V), 2))
+            except MemoryError:
+                #try to sum a slower way instead without creating a large intermediate array
+                r2 = np.zeros((u.shape[0], v.shape[0]))
+                for i in range(u.shape[0]):
+                    for j in range(v.shape[0]):
+                        r2[i,j] = np.sum(np.square(u[i,:] - v[j,:]))
         return r2

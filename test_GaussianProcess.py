@@ -23,25 +23,38 @@ def test_r2_distance():
 vec = arrays(np.float64, array_shapes(1,1,1,500), elements=st.floats(min_value=-1e15, max_value=1e15)) 
 mixed = arrays(np.float64, array_shapes(1,2,2,500), elements=st.floats(min_value=-1e15, max_value=1e15)) 
 
+@st.composite
+def strat_shape(draw, d):
+    n = draw(st.integers(1,100))
+    return (n, d)
+
 #Allow more time for these tests
 with settings(deadline=None):
     @given(st.data())
     def test_r2_distance_list_vectors(data):
         #draw both x and y so that have shapes (m x d) and (n x d) respectively
         d = data.draw(st.integers(1,100), 'd')
-        strat_array = arrays(np.float64, (10, d), elements=st.floats(min_value=-1e5, max_value=1e5)) 
+        strat_array = arrays(np.float64, strat_shape(d), elements=st.floats(min_value=-1e5, max_value=1e5)) 
         x = data.draw(strat_array, 'x')
         y = data.draw(strat_array, 'y')
-    
+        
         test_r2_distance_tests(x, y)
     
     @given(vec , vec)
     def test_r2_distance_vectors(x, y):
         test_r2_distance_tests(x, y)
         
-    @given(vec , mixed)
-    def test_r2_distance_mixed(x, y):
+    @given(st.data())
+    def test_r2_distance_mixed(data):
+        #draw both x and y so that have shapes (d) and (n x d) respectively
+        d = data.draw(st.integers(1,100), 'd')
+        strat_array_x = arrays(np.float64, strat_shape(d), elements=st.floats(min_value=-1e5, max_value=1e5))
+        strat_array_y = arrays(np.float64, d, elements=st.floats(min_value=-1e5, max_value=1e5))
+        x = data.draw(strat_array_x, 'x')
+        y = data.draw(strat_array_y, 'y')
+        
         test_r2_distance_tests(x, y)
+        test_r2_distance_tests(y, x)
         
     @given(vec , mixed)
     def test_r2_distance_floats(x, y):
@@ -123,8 +136,8 @@ def test_GP_samples_1d(plotFlag = True):
         plt.show()
         
 if __name__ == '__main__':
-#    test_r2_distance()
+   test_r2_distance()
 #    test_brownian_bridge()
 #    test_GP_interp_1d()
 #    test_GP_interp_2d()
-    test_GP_samples_1d()
+#    test_GP_samples_1d()
