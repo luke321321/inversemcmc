@@ -155,6 +155,7 @@ class GaussianProcess:
         #Now check dimensions and inputs
         dim_U = len(u.shape)
         dim_V = len(v.shape)
+
         
         assert dim_U <= 2 and dim_V <= 2
         if dim_U == 2 and dim_V == 2:
@@ -175,9 +176,9 @@ class GaussianProcess:
         elif dim_U < 2 or dim_V < 2:
             #cases 3 and 4, make u have the smallest dimension
             if dim_U > dim_V:
-                u,v = v,u
-            u = u[np.newaxis, :]
-            r2 = np.sum(np.square(u-v), 1)
+                U,V = v,u
+            U = U[np.newaxis, :]
+            r2 = np.sum(np.square(U-V), 1)
         else:
             #Deal with large u and v incase of out of memory errors
             try:
@@ -187,7 +188,10 @@ class GaussianProcess:
             except MemoryError:
                 #try to sum a slower way instead without creating a large intermediate array
                 r2 = np.zeros((u.shape[0], v.shape[0]))
-                for i in range(u.shape[0]):
+                if u.shape[0] < v.shape[0]:
+                    for i in range(u.shape[0]):
+                        r2[i,:] = np.sum(np.square(u[i][np.newaxis, :]- v), 1)
+                else:
                     for j in range(v.shape[0]):
-                        r2[i,j] = np.sum(np.square(u[i,:] - v[j,:]))
+                        r2[:,j] = np.sum(np.square(u - v[j][np.newaxis, :]), 1)
         return r2
