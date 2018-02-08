@@ -78,11 +78,15 @@ def test_r2_distance_tests(x, y):
         assert (d_xx.diagonal() == 0).all()
         
 def test_brownian_bridge():
-    points = np.array([0,0.5,1])
+    design_pts = GaussianProcess.create_uniform_grid(-2,2,5,1)
+    obs = np.random.randn(5)
+    GP = GaussianProcess(design_pts, obs)
+    x = 0.5
+    points = np.array([0,x,1])
     data = np.array([0,0,1.])
     plt.figure()
     for i in range(30):
-        data[1] = GaussianProcess.Brownian_bridge(points,data,0.5)
+        data[1] = GP.Brownian_bridge(x, points[[0,2]], data[[0,2]])
         plt.plot(points, data)
     plt.show()
         
@@ -91,7 +95,7 @@ def test_GP_interp_1d(plotFlag = True):
     design_pts = GaussianProcess.create_uniform_grid(-2,2,10)
     obs = np.random.normal(size = 10)
     GP1 = GaussianProcess(design_pts, obs)
-    GP_interp_method = GP1.GP(100)
+    GP_interp_method = GP1.GP_interp(100)
     vGP_interp_method = np.vectorize(GP_interp_method)
     
     #Plot results:
@@ -106,7 +110,7 @@ def test_GP_interp_2d(plotFlag = True):
     design_pts = GaussianProcess.create_uniform_grid(-2,2,5,2)
     obs = np.random.randn(5 ** 2)
     GP1 = GaussianProcess(design_pts, obs)
-    GP_interp_method = GP1.GP(25)
+    GP_interp_method = GP1.GP_interp(25)
     vGP_interp_method = np.vectorize(GP_interp_method, signature='(i)->()')
     
     #Plot results:
@@ -126,8 +130,8 @@ def test_GP_samples_1d(plotFlag = True):
     design_pts = GaussianProcess.create_uniform_grid(-2,2,5,1)
     obs = np.random.randn(5)
     GP1 = GaussianProcess(design_pts, obs)
-    grid = GaussianProcess.create_uniform_grid(-2,2,21,1)
-    realisation = GP1.GP_at_points(grid, num_evals=30)
+    grid = GaussianProcess.create_uniform_grid(-2,2,3000,1)
+    realisation = GP1.GP_at_points(grid, num_evals=1).T
 
     if plotFlag:
         plt.figure()
@@ -135,9 +139,41 @@ def test_GP_samples_1d(plotFlag = True):
         plt.plot(design_pts, obs, 'ro')
         plt.show()
         
+def test_check_mem():
+    design_pts = GaussianProcess.create_uniform_grid(-2,2,5,2)
+    obs = np.random.randn(5 ** 2)
+    GP = GaussianProcess(design_pts, obs, total_calls = 1)
+    GP.check_mem()
+    assert len(GP.X) == 2 * (5 ** 2)
+    assert len(GP.Y) == 2 * (5 ** 2)
+    
+def test_GP_Brownian_bridge_1d(plotFlag = True):
+    design_pts = GaussianProcess.create_uniform_grid(-2,2,10)
+    obs = np.random.normal(size = 10)
+    GP = GaussianProcess(design_pts, obs)
+    
+    grid = np.random.uniform(low = -2, high = 2 , size = 1000)
+    for x in grid:
+        GP.GP_eval(x)
+        
+    #Sort to plot nicer
+    ind = np.argsort(GP.X.flatten())
+    X = GP.X.flatten()[ind]
+    Y = GP.Y[ind]
+    #Plot results:
+    if plotFlag:
+        plt.figure()
+        plt.plot(design_pts, obs, 'ro')
+        
+        plt.plot(X, Y)
+        plt.show()
+    
+        
 if __name__ == '__main__':
-   test_r2_distance()
-#    test_brownian_bridge()
+#    test_r2_distance()
+    test_brownian_bridge()
 #    test_GP_interp_1d()
 #    test_GP_interp_2d()
 #    test_GP_samples_1d()
+#    test_check_mem()
+#    test_GP_Brownian_bridge_1d()

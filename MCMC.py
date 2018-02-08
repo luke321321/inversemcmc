@@ -141,7 +141,7 @@ def runMCMC(dens, length, speed_random_walk, x0, x, N):
 sigma = 0.1
 dim_U = 2
 length = 10**4 #length of random walk in MCMC
-num_design_points = 30 #in each dimension
+num_design_points = 20 #in each dimension
 speed_random_walk = 0.1
 #End points of n-dim lattice for the design points
 min_range = -1
@@ -151,7 +151,7 @@ num_obs = 10
 #N: number basis functions for solving PDE
 N = 10 ** 3
 #point to solve PDE at
-x = 0.45
+x = 0.2
 
 #Generate data
 #The truth u_dagger lives in [-1,0.5]
@@ -176,10 +176,8 @@ else:
 design_points = gp.create_uniform_grid(min_range,max_range,num_design_points, dim_U)
 GP = gp(design_points, vphi(design_points))
     
-#%% Generate \phi_N
 #Grid points to interpolate with
 num_GP_grid_points = num_design_points*4
-
 
 #%% Calculations
 #u lives in [-1,1] so use uniform dist as prior or could use normal with cutoff |x| < 2 
@@ -207,9 +205,8 @@ if flag_run_MCMC:
     if 0:
         interp = GP.GP(num_GP_grid_points)
         density_post = lambda u: np.exp(-interp(u))*density_prior(u)
-        print('\n pi^N_rand')
+        print('\n pi^N_rand via interpolation')
         _, run_rand = runMCMC(density_post, length*10, speed_random_walk, x0, x, N)
-    
 
 
 #%% Plotting 
