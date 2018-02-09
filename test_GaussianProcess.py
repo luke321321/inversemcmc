@@ -82,7 +82,7 @@ def test_brownian_bridge():
     obs = np.random.randn(5)
     GP = GaussianProcess(design_pts, obs)
     x = 0.5
-    points = np.array([0,x,1])
+    points = np.array([0,x,1.])
     data = np.array([0,0,1.])
     plt.figure()
     for i in range(30):
@@ -147,33 +147,64 @@ def test_check_mem():
     assert len(GP.X) == 2 * (5 ** 2)
     assert len(GP.Y) == 2 * (5 ** 2)
     
-def test_GP_Brownian_bridge_1d(plotFlag = True):
-    design_pts = GaussianProcess.create_uniform_grid(-2,2,10)
-    obs = np.random.normal(size = 10)
+def test_GP_Brownian_bridge_1d():
+    np.random.seed(10)
+    design_pts = GaussianProcess.create_uniform_grid(-2,2,5)
+    obs = np.random.normal(size = 5)
     GP = GaussianProcess(design_pts, obs)
     
-    grid = np.random.uniform(low = -2, high = 2 , size = 1000)
-    for x in grid:
-        GP.GP_eval(x)
+    plt.figure()
+    for _ in range(1):
+#        grid = np.random.uniform(low = -2, high = 2 , size = 3000)
+        grid = GaussianProcess.create_uniform_grid(-2,2,3000,1)
+        np.random.shuffle(grid)
         
-    #Sort to plot nicer
-    ind = np.argsort(GP.X.flatten())
-    X = GP.X.flatten()[ind]
-    Y = GP.Y[ind]
-    #Plot results:
-    if plotFlag:
-        plt.figure()
-        plt.plot(design_pts, obs, 'ro')
-        
+        for x in grid:
+            GP.GP_eval(x)
+           
+        #Sort to plot nicer
+        ind = np.argsort(GP.X.flatten())
+        X = GP.X.flatten()[ind]
+        Y = GP.Y[ind]
+        #Plot results:
         plt.plot(X, Y)
-        plt.show()
+        GP.reset()
+    plt.plot(design_pts, obs, 'ro')
+    plt.show()    
     
+def test_find_closest_2d():
+    X = np.random.uniform(size=(20,2))
+    x = np.random.uniform(size=(1,2))
+    
+    plt.figure()
+    plt.plot(X[:,0], X[:,1],'bo')
+    plt.plot(x[:,0], x[:,1],'ro')
+    hull = X[GaussianProcess.find_closest(x,X)]
+    plt.plot(hull[:,0], hull[:,1], 'go')
+    plt.show()
+    
+def test_find_closest_1d():
+    X = np.random.uniform(size=(20))
+    x = np.random.uniform(size=(1))
+    hull = X[GaussianProcess.find_closest(x,X)]
+    
+    plt.figure()
+    plt.hlines(1,0,1)
+    plt.eventplot(X, orientation='horizontal', colors='b', linestyles='dotted')
+    plt.eventplot(x, orientation='horizontal', colors='r')
+    plt.eventplot(hull, orientation='horizontal', colors='g', linestyles='dashed')
+    plt.axis('off')
+
+    plt.show()
+    #Green are closen points, red is x, blue dotted are X (not chosen)
         
 if __name__ == '__main__':
 #    test_r2_distance()
-    test_brownian_bridge()
+#    test_brownian_bridge()
 #    test_GP_interp_1d()
 #    test_GP_interp_2d()
-#    test_GP_samples_1d()
+    test_GP_samples_1d()
 #    test_check_mem()
-#    test_GP_Brownian_bridge_1d()
+    test_GP_Brownian_bridge_1d()
+#    test_find_closest_1d()
+#    test_find_closest_2d()
