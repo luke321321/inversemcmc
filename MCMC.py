@@ -171,8 +171,8 @@ def solve_PDE_at_x(u,N,x):
 #First neeed to generate some data y
 #setup
         
-sigma = 0.05 #size of noise in observations
-dim_U = 2
+sigma = 0.1 #size of noise in observations
+dim_U = 1
 length = 10 ** 4 #length of MCMC
 num_design_points = 20 #in each dimension
 speed_random_walk = 0.1
