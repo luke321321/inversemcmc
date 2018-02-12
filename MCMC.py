@@ -22,9 +22,9 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 #kv is modified Bessel function of second kind
 from scipy.sparse import diags
-#from scipy.sparse.linalg import spsolve
+from scipy.sparse.linalg import spsolve
 #Quicker sparse LA solver: install via: 'conda install -c haasad pypardiso'
-from pypardiso import spsolve
+#from pypardiso import spsolve
 #Progress bar
 from tqdm import tqdm
 
