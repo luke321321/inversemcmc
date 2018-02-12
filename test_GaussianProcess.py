@@ -81,11 +81,11 @@ def test_brownian_bridge():
     design_pts = GaussianProcess.create_uniform_grid(-2,2,5,1)
     obs = np.random.randn(5)
     GP = GaussianProcess(design_pts, obs)
-    x = 0.5
-    points = np.array([0,x,1.])
+    x = np.array([0.5])
+    points = np.array([[0],x,[1.]])
     data = np.array([0,0,1.])
     plt.figure()
-    for i in range(30):
+    for i in range(15):
         data[1] = GP.Brownian_bridge(x, points[[0,2]], data[[0,2]])
         plt.plot(points, data)
     plt.show()
@@ -139,6 +139,26 @@ def test_GP_samples_1d(plotFlag = True):
         plt.plot(design_pts, obs, 'ro')
         plt.show()
         
+def test_GP_samples_2d(plotFlag = True):
+    design_pts = GaussianProcess.create_uniform_grid(-2,2,5,2)
+    obs = np.random.randn(5 ** 2)
+    GP = GaussianProcess(design_pts, obs)
+    grid = GaussianProcess.create_uniform_grid(-2,2,50,2)
+    Z = GP.GP_at_points(grid, num_evals=1).T
+
+    if plotFlag:
+        fig = plt.figure()
+        ax = fig.gca(projection='3d')
+        
+        X = grid[:,0]
+        Y = grid[:,1]
+        Z = Z.flatten()
+        #Plot the surface
+        ax.plot_trisurf(X, Y, Z)
+        #Plot the design points
+        ax.scatter(design_pts[:,0], design_pts[:,1], obs, color='green')
+        plt.show()
+        
 def test_check_mem():
     design_pts = GaussianProcess.create_uniform_grid(-2,2,5,2)
     obs = np.random.randn(5 ** 2)
@@ -154,9 +174,10 @@ def test_GP_Brownian_bridge_1d():
     
     plt.figure()
     for _ in range(1):
-#        grid = np.random.uniform(low = -2, high = 2 , size = 3000)
-        grid = GaussianProcess.create_uniform_grid(-2,2,3000,1)
-        np.random.shuffle(grid)
+        grid = np.random.uniform(low = -2, high = 2 , size = (3000,1))
+#        OR uniform grid in random order:
+#        grid = GaussianProcess.create_uniform_grid(-2,2,3000,1)
+#        np.random.shuffle(grid)
         
         for x in grid:
             GP.GP_eval(x)
@@ -171,6 +192,30 @@ def test_GP_Brownian_bridge_1d():
         GP.reset()
     plt.plot(design_pts, obs, 'ro')
     plt.show()    
+    
+def test_GP_Brownian_bridge_2d():
+    design_pts = GaussianProcess.create_uniform_grid(-2, 2, 5, 2)
+    obs = np.random.randn(5 ** 2)
+    GP = GaussianProcess(design_pts, obs)
+    
+    #Plot results:
+    fig = plt.figure()
+    ax = fig.gca(projection='3d')
+    
+    grid = GaussianProcess.create_uniform_grid(-2, 2, 50, 2)
+    np.random.shuffle(grid)
+    
+    for x in grid:
+        GP.GP_eval(x[np.newaxis, :])
+        
+    points, Z = GP.get_data()
+    X = points[:,0]
+    Y = points[:,1]
+    #Plot the surface
+    ax.plot_trisurf(X, Y, Z)
+    #Plot the design points
+    ax.scatter(design_pts[:,0], design_pts[:,1], obs, color='green')
+    plt.show()
     
 def test_find_closest_2d():
     X = np.random.uniform(size=(20,2))
@@ -201,12 +246,21 @@ def test_find_closest_1d():
 if __name__ == '__main__':
 #    test_r2_distance()
 #    test_brownian_bridge()
-#    test_GP_interp_1d()
-#    test_GP_interp_2d()
-    np.random.seed(100)  
-    test_GP_samples_1d()
 #    test_check_mem()
-    np.random.seed(100)
+    
+#    np.random.seed(100)  
+#    test_GP_samples_1d()
+#    np.random.seed(100)
     test_GP_Brownian_bridge_1d()
+#    np.random.seed(100)
+#    test_GP_interp_1d()
+    
+#    np.random.seed(100)
+#    test_GP_samples_2d()
+#    np.random.seed(100)
+#    test_GP_Brownian_bridge_2d()
+#    np.random.seed(100)
+#    test_GP_interp_2d()
+    
 #    test_find_closest_1d()
 #    test_find_closest_2d()
