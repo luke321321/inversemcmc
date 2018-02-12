@@ -1,7 +1,16 @@
 """
-Created on Wed Dec  6 14:33:52 2017
+Solving a PDE inverse problem using MCMC
+Trick: uses a Gaussian Process to approximate the solution to the given PDE
+Speeds up each evaulation in MCMC
 
-@author: s1002685
+Tricky bit: don't know the points will call GP beforehand so have to generate the GP 'on the run'
+
+PDE in p is:
+-d/dx (k(x; u) dp/dx(x; u)) = 1 in (0,1)
+p(1; u) = p(0; u) = 0
+
+k(x; u) = 1/100 + \sum_j^d u_j/(200(d + 1)) * sin(2\pi jx),
+where u \in [-1,1]^d and the truth u^* is randomly generated.
 
 """
 import numpy as np
@@ -17,9 +26,9 @@ from pypardiso import spsolve
 #Progress bar
 from tqdm import tqdm
 
-import timeit
-import cProfile
-import pstats
+#import timeit
+#import cProfile
+#import pstats
 
 from GaussianProcess import GaussianProcess as gp
 
@@ -149,7 +158,7 @@ max_range = 1
 num_obs = 10
 
 #N: number basis functions for solving PDE
-N = 10 ** 3
+N = 10 ** 4
 #point to solve PDE at
 x = 0.2
 
@@ -177,7 +186,7 @@ design_points = gp.create_uniform_grid(min_range,max_range,num_design_points, di
 GP = gp(design_points, vphi(design_points))
     
 #Grid points to interpolate with
-num_GP_grid_points = num_design_points*4
+num_interp_points = num_design_points*4
 
 #%% Calculations
 #u lives in [-1,1] so use uniform dist as prior or could use normal with cutoff |x| < 2 
@@ -201,9 +210,14 @@ if flag_run_MCMC:
         density_post = lambda u: np.exp(-GP.mean(u))*density_prior(u)
         print('\n GP as mean')
         _, run_mean = runMCMC(density_post, length*10, speed_random_walk, x0, x, N)
+        
+    if 1:
+        density_post = lambda u: np.exp(-GP.GP_eval(u))*density_prior(u)
+        print('\n GP - one evaluation')
+        _, run_GP = runMCMC(density_post, length*10, speed_random_walk, x0, x, N)
     
     if 0:
-        interp = GP.GP(num_GP_grid_points)
+        interp = GP.GP(num_interp_points)
         density_post = lambda u: np.exp(-interp(u))*density_prior(u)
         print('\n pi^N_rand via interpolation')
         _, run_rand = runMCMC(density_post, length*10, speed_random_walk, x0, x, N)
@@ -211,17 +225,17 @@ if flag_run_MCMC:
 
 #%% Plotting 
 #Plotting phi and GP of phi:
-flag_plot = 0
+flag_plot = 1
 if flag_plot:      
     #Vectorise GP for plotting
-    vGP = np.vectorize(lambda u: GP.mean(u), signature='(i)->()')
+    vGP = np.vectorize(lambda u: GP.GP_eval(u), signature='(i)->()')
     if dim_U == 1:
         #This is just 1d plot
-        t = np.linspace(min_range,max_range,20)
-        vGP = np.vectorize(lambda u: GP.mean(u))
-        plt.plot(t,vGP(t))
+        t = np.linspace(min_range, max_range, 20)
+        vGP = np.vectorize(lambda u: GP.GP_eval(u))
+        plt.plot(t, vGP(t))
         #plt.plot(t,v2phi(t), color='green')
-        plt.plot(design_points,vphi(design_points), 'ro')
+        plt.plot(design_points, vphi(design_points), 'ro')
         plt.show()
     elif dim_U == 2:
         X = np.linspace(min_range, max_range, 20)
@@ -233,20 +247,20 @@ if flag_plot:
         fig = plt.figure()
         ax = fig.gca(projection='3d')
         #Plot the surface
-        ax.plot_trisurf(X, Y, vGP(Z), antialiased=True)
+        ax.plot_trisurf(X, Y, vGP(Z))
         #Plot the design points
-        ax.scatter(design_points[:,0], design_points[:,1], v2phi(design_points), color='green')
+        ax.scatter(design_points[:,0], design_points[:,1], vphi(design_points), color='green')
         plt.show()
         
 #%% Plot hist  
-flag_plot = 0
+flag_plot = 1
 if flag_plot:
     plt.figure()
     if dim_U == 1:
-        plt.hist(dist_prior, bins=101, alpha=0.5, density=True, label='Prior')
+        plt.hist(run_GP, bins=101, alpha=0.5, density=True, label='Prior')
 #        plt.hist(distPost, bins=101, alpha=0.5, density=True, label='Post')
     else:
-        plt.hist(dist_prior[:,0], bins=101, alpha=0.5, density=True, label='Prior')
+        plt.hist(run_GP[:,0], bins=101, alpha=0.5, density=True, label='Prior')
 #        plt.hist(distPost[:,0], bins=101, alpha=0.5, density=True, label='Post')
     plt.legend(loc='upper right')
     plt.show()
@@ -285,10 +299,6 @@ if flag_plot:
     plt.title('Solution to PDE for different parameters')
     plt.show()
 
-#%% Testing Metroplis-Hastings algorithm
-#x = MH_random_walk(normal_density, length=100000, speed=0.5, x0=np.array([0,0,0,0,0]))
-#plt.hist(x, bins=77,  density=True)
-#plt.show()
     
 #%%Testing code for PDE solver
 #u = np.random.randn(1)

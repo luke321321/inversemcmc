@@ -225,7 +225,7 @@ class GaussianProcess:
         mean, ker = self.create_matern(data = data, points = points)
 
         if len(x.shape) == 1:
-            x = x[:, np.newaxis]
+            x = x.reshape(1, self.dim)
         all_pts = np.concatenate((x, points))
         val = np.random.multivariate_normal(mean(all_pts), ker(all_pts, all_pts))
         return val[0]
