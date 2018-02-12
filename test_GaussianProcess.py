@@ -1,10 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Wed Jan 24 11:33:32 2018
-
-@author: s1002685
-"""
-
 import numpy as np
 import hypothesis.strategies as st
 from hypothesis import given, assume, settings

@@ -1,16 +1,8 @@
-"""
-Created on Thu Jan 18 11:30:39 2018
-
-@author: s1002685
-"""
-
 import numpy as np
 import math
 import numbers
 from scipy.special import gamma, kv
 from scipy.interpolate import RegularGridInterpolator, interp1d
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 
 class GaussianProcess:
     def __init__(self, points, data, total_calls = 1000, nu=1/2, sig2 = 1, lam = 1):

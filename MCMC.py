@@ -43,7 +43,7 @@ def MH_random_walk(density, length, speed=0.5, x0=np.array([0]), burn_time=1000)
         dim = 1
         
     x = np.zeros((burn_time + length, dim))
-    #Generates normal rv in R^n of length=speed or 0.
+    #Pre-generates the normal rv in R^n
     rvNormal = speed*np.random.normal(size=(burn_time + length, dim))
     
     accepted_count = 0
@@ -69,12 +69,27 @@ def MH_random_walk(density, length, speed=0.5, x0=np.array([0]), burn_time=1000)
                 x[i] = x[i-1]
     return accepted_count, x[burn_time:]
 
+def runMCMC(dens, length, speed_random_walk, x0, x, N):
+    """Helper function to start off running MCMC"""
+    print('Running MCMC with length:', length, 'and speed:', speed_random_walk)
+    accepts, run = MH_random_walk(dens, length, x0=x0, speed=speed_random_walk)
+    #cProfile.runctx('MH_random_walk(density_prior, length, x0=x0, speed=speed_random_walk)'
+    #                , globals(), locals(), '.prof')
+    #s = pstats.Stats('.prof')
+    #s.strip_dirs().sort_stats('time').print_stats(30)
+    mean = np.sum(run, 0)/length
+    print('Mean is:', mean)
+    print('We accepted this number of times:', accepts)
+    sol_at_mean = solve_PDE_at_x(mean,N,x)
+    print('Solution to PDE at mean is:', sol_at_mean)
+    return accepts, run
 
 #%% PDE solver code
 def solve_PDE(u,N):
     """Solves the PDE in (0,1) with coefficients u and
     N number of Chebyshev interpolant points"""
     
+    #Boundary condition, p(1; u) = c
     c = 100.
     
     #create N Chebyshev nodes in (0,1)
@@ -152,44 +167,28 @@ def solve_PDE_at_x(u,N,x):
     i = np.searchsorted(nodes, x)
     return (p[i-1]*(x - nodes[i-1])+ p[i]*(nodes[i] - x))/(nodes[i] - nodes[i-1])
 
-
-def runMCMC(dens, length, speed_random_walk, x0, x, N):
-        print('Running MCMC with length:', length, 'and speed:', speed_random_walk)
-        accepts, run = MH_random_walk(dens, length, x0=x0, speed=speed_random_walk)
-        #cProfile.runctx('MH_random_walk(density_prior, length, x0=x0, speed=speed_random_walk)'
-        #                , globals(), locals(), '.prof')
-        #s = pstats.Stats('.prof')
-        #s.strip_dirs().sort_stats('time').print_stats(30)
-        mean = np.sum(run, 0)/length
-        print('Mean is:', mean)
-        print('We accepted this number of times:', accepts)
-        sol_at_mean = solve_PDE_at_x(mean,N,x)
-        print('Solution to PDE at mean is:', sol_at_mean)
-        return accepts, run
-
 #%% Setup variables and functions
 #First neeed to generate some data y
 #setup
         
-#sigma is noise in observations
-sigma = 0.05
-dim_U = 1
-length = 10**4 #length of random walk in MCMC
+sigma = 0.05 #size of noise in observations
+dim_U = 2
+length = 10 ** 4 #length of MCMC
 num_design_points = 20 #in each dimension
 speed_random_walk = 0.1
 #End points of n-dim lattice for the design points
 min_range = -1
 max_range = 1
-num_obs = 50
+num_obs = 25
 
 #N: number basis functions for solving PDE
-N = 2 ** 15
+N = 2 ** 12
 #point to solve PDE at
-x = 0.15
+x = 0.3
 
 #Generate data
-#The truth u_dagger lives in [-1,0.5]
-u_dagger = np.random.rand(dim_U) - 1
+#The truth u_dagger lives in [-1,1]
+u_dagger = 2*np.random.rand(dim_U) - 1
 #u_dagger = -0.7
 G_u_dagger = solve_PDE_at_x(u_dagger, N, x)
 #y = G_u_dagger
@@ -197,8 +196,8 @@ y = np.broadcast_to(G_u_dagger, (num_obs, dim_U)) + sigma*np.random.standard_nor
 
 _ROOT2PI = math.sqrt(2*math.pi)
 normal_density = lambda x: math.exp(-np.sum(x ** 2)/2)/_ROOT2PI
-#uniform density for [-1,1]
-uniform_density = lambda x: 1*(np.sum(x ** 2) <= 2)
+#uniform density for |x[i]| < 1.1
+uniform_density = lambda x: 1*(np.amax(np.abs(x)) <= 1.1)
 
 phi = lambda u: np.sum((y - solve_PDE_at_x(u,N,x)) ** 2)/(2*sigma*num_obs)
 vphi = np.vectorize(phi, signature='(i)->()')
@@ -221,7 +220,7 @@ if flag_run_MCMC:
     x0 = np.zeros(dim_U)
     print('Parameter is:', u_dagger)
     print('Solution to PDE at',x,'for true parameter is:', G_u_dagger)
-    print('Mean of y for', num_obs,'observations is:', np.sum(y, 0)/num_obs)
+    print('Mean of y for', num_obs,'observations is:', np.sum(y)/(num_obs*dim_U))
     
     if 0:
         density_post = lambda u: np.exp(-phi(u))*density_prior(u)
@@ -280,10 +279,8 @@ if flag_plot:
     plt.figure()
     if dim_U == 1:
         plt.hist(run_GP, bins=101, alpha=0.5, density=True, label='Post')
-#        plt.hist(distPost, bins=101, alpha=0.5, density=True, label='Post')
     else:
         plt.hist(run_GP[:,0], bins=101, alpha=0.5, density=True, label='Post')
-#        plt.hist(distPost[:,0], bins=101, alpha=0.5, density=True, label='Post')
     plt.legend(loc='upper right')
     plt.show()
         
@@ -297,7 +294,7 @@ if flag_plot:
     for i in np.linspace(-1,1,5):
         plt.plot(X,v_likelihood(i,X),label=i)
     plt.legend(loc='upper right')
-    plt.title('Likelihood for different truths u_dagger')
+    plt.title('Likelihood for different truths u_dagger' + ' at x=' + str(x))
     plt.show()
 
 #likelihood for u_dagger in 1d
@@ -308,7 +305,7 @@ if flag_plot:
     v_likelihood = np.vectorize(lambda u,y: np.exp(-np.sum((solve_PDE_at_x(y,N,x)-solve_PDE_at_x(u,N,x))**2)/(2*sigma*num_obs)))
     plt.plot(X,v_likelihood(u_dagger,X),label=str(u_dagger))
     plt.legend(loc='upper right')
-    plt.title('Likelihood for different truth u_dagger' + str(u_dagger))
+    plt.title('Likelihood for different truth u_dagger' + str(u_dagger) + ' at x=' + str(x))
     plt.show()
         
 #%% Plot solution to PDE at different parameters
