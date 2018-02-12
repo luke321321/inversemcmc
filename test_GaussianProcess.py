@@ -148,7 +148,6 @@ def test_check_mem():
     assert len(GP.Y) == 2 * (5 ** 2)
     
 def test_GP_Brownian_bridge_1d():
-    np.random.seed(10)
     design_pts = GaussianProcess.create_uniform_grid(-2,2,5)
     obs = np.random.normal(size = 5)
     GP = GaussianProcess(design_pts, obs)
@@ -163,9 +162,10 @@ def test_GP_Brownian_bridge_1d():
             GP.GP_eval(x)
            
         #Sort to plot nicer
-        ind = np.argsort(GP.X.flatten())
-        X = GP.X.flatten()[ind]
-        Y = GP.Y[ind]
+        X,Y = GP.get_data()
+        ind = np.argsort(X.flatten())
+        X = X.flatten()[ind]
+        Y = Y[ind]
         #Plot results:
         plt.plot(X, Y)
         GP.reset()
@@ -203,8 +203,10 @@ if __name__ == '__main__':
 #    test_brownian_bridge()
 #    test_GP_interp_1d()
 #    test_GP_interp_2d()
+    np.random.seed(100)  
     test_GP_samples_1d()
 #    test_check_mem()
+    np.random.seed(100)
     test_GP_Brownian_bridge_1d()
 #    test_find_closest_1d()
 #    test_find_closest_2d()

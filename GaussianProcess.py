@@ -132,6 +132,11 @@ class GaussianProcess:
                                 np.zeros(self.total_calls - self.data_length, dtype=self.data.dtype)))
         self.index = self.data_length
         
+    def get_data(self):
+        X = self.X[:self.index]
+        Y = self.Y[:self.index]
+        return X,Y
+    
     def GP_eval(self, x):
         #first check lengeth of array X and Y and expand if necessary
         self.check_mem()
@@ -139,7 +144,6 @@ class GaussianProcess:
         #first find closest 2*d points to x
         #Ideally create RTree but first do naive thing 
         #runs in O(n) time instead of O(log(n)) for RTree insertion and nearest neighbour
-
         
         #only check distance up to computed values of X - about 1/2 of X is 0s
         dist = self.r2_distance(x, self.X[:self.index])           
@@ -149,6 +153,7 @@ class GaussianProcess:
         if dist[ind_min_dist] < self.tol:
             return self.Y[ind_min_dist]
         
+        #indices of closest points to x in each dimension (up to 2*d points)
         ind = self.find_closest(x, self.X[:self.index], dist)
                
         points = self.X[ind]
@@ -159,12 +164,12 @@ class GaussianProcess:
         self.X[self.index] = x
         self.Y[self.index] = data_new
         self.index += 1
-        
+
         return data_new
     
     @staticmethod
     def find_closest(x, X, dist=None):
-        """Finds a closest points of X to x in each direction
+        """Finds a closest points of X to x in each signed direction
         Returns: index an array of lists st closest points are X[index] """
         
         #if dim = 1 reshape to reuse code
@@ -211,18 +216,19 @@ class GaussianProcess:
             self.Y = np.concatenate((self.Y, np.zeros(len(self.Y), dtype=self.Y.dtype)))
     
     def Brownian_bridge(self, x, points, data):
-        """Uses a Brownian bridge to interpolate a function at x given
-        value at two points x_0 and x_1.
+        """Uses a small Gaussian process to evaluate the GP at x given it at points
         
-        Points: np array (x0, x1)
-        Data: np array (f(x0), f(x1))"""
+        x: point to calculate the GP at
+        Points: np array (x0, x1, ...)
+        Data: np array (f(x0), f(x1), ...)"""
         
-        mean, cor = self.create_matern(data = data, points = points)
-#        T = np.sqrt(GaussianProcess.r2_distance(points[0], points[1]))
-#        t = np.sqrt(GaussianProcess.r2_distance(points[0], x))
-#        return data[0] + np.random.normal(scale=cor) + t/T *(data[1]-data[0])
-        
-        return mean(x) + np.random.normal(scale=cor(x,x))
+        mean, ker = self.create_matern(data = data, points = points)
+
+        if len(x.shape) == 1:
+            x = x[:, np.newaxis]
+        all_pts = np.concatenate((x, points))
+        val = np.random.multivariate_normal(mean(all_pts), ker(all_pts, all_pts))
+        return val[0]
 
 
     @staticmethod
