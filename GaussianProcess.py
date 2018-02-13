@@ -116,7 +116,7 @@ class GaussianProcess:
         
 
     def reset(self):
-        #setup empty arrays to store data and coordinates in for Brownian bridge
+        """Setup empty arrays to store data and coordinates in for GP_eval method"""
         self.X = np.concatenate((self.points, 
                                 np.zeros((self.total_calls - self.data_length, self.dim), dtype=self.points.dtype)))
         self.Y = np.concatenate((self.data, 
@@ -124,6 +124,7 @@ class GaussianProcess:
         self.index = self.data_length
         
     def get_data(self):
+        """Returns the non-zero data and points"""
         X = self.X[:self.index]
         Y = self.Y[:self.index]
         return X,Y
@@ -150,7 +151,7 @@ class GaussianProcess:
                
         points = self.X[ind]
         data = self.Y[ind]
-        data_new = self.Brownian_bridge(x, points, data)
+        data_new = self.GP_bridge(x, points, data)
         
         #add new data to class
         self.X[self.index] = x
@@ -204,12 +205,13 @@ class GaussianProcess:
         return np.array(list(index))
             
     def check_mem(self):
+        """Checks if storage arrays are big enough and resizes if needed"""
         if(self.index == len(self.X)):
             #double length of arrays
             self.X = np.concatenate((self.X, np.zeros((len(self.X), self.dim), dtype=self.X.dtype)))
             self.Y = np.concatenate((self.Y, np.zeros(len(self.Y), dtype=self.Y.dtype)))
     
-    def Brownian_bridge(self, x, points, data):
+    def GP_bridge(self, x, points, data):
         """Uses a small Gaussian process to evaluate the GP at x given it at points
         
         x: point to calculate the GP at

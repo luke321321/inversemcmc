@@ -70,7 +70,7 @@ def test_r2_distance_tests(x, y):
     else:
         assert (d_xx.diagonal() == 0).all()
         
-def test_brownian_bridge():
+def test_GP_bridge():
     design_pts = GaussianProcess.create_uniform_grid(-2,2,5,1)
     obs = np.random.randn(5)
     GP = GaussianProcess(design_pts, obs)
@@ -79,9 +79,11 @@ def test_brownian_bridge():
     data = np.array([0,0,1.])
     plt.figure()
     for i in range(15):
-        data[1] = GP.Brownian_bridge(x, points[[0,2]], data[[0,2]])
+        data[1] = GP.GP_bridge(x, points[[0,2]], data[[0,2]])
         plt.plot(points, data)
+    plt.title('test_GP_bridge')
     plt.show()
+    
         
 
 def test_GP_interp_1d(plotFlag = True):
@@ -97,6 +99,7 @@ def test_GP_interp_1d(plotFlag = True):
         plt.plot(design_pts, obs, 'ro')
         grid = GaussianProcess.create_uniform_grid(-2,2,1000)
         plt.plot(grid, vGP_interp_method(grid))
+        plt.title('test_GP_interp_1d')
         plt.show()
 
 def test_GP_interp_2d(plotFlag = True):
@@ -117,6 +120,7 @@ def test_GP_interp_2d(plotFlag = True):
         ax.plot_trisurf(X, Y, vGP_interp_method(Z)) #, antialiased=True
         #Plot the design points
         ax.scatter(design_pts[:,0], design_pts[:,1], obs, color='green')
+        plt.title('test_GP_interp_2d')
         plt.show()
     
 def test_GP_samples_1d(plotFlag = True):
@@ -130,6 +134,7 @@ def test_GP_samples_1d(plotFlag = True):
         plt.figure()
         plt.plot(grid, realisation)
         plt.plot(design_pts, obs, 'ro')
+        plt.title('test_GP_samples_1d')
         plt.show()
         
 def test_GP_samples_2d(plotFlag = True):
@@ -150,6 +155,7 @@ def test_GP_samples_2d(plotFlag = True):
         ax.plot_trisurf(X, Y, Z)
         #Plot the design points
         ax.scatter(design_pts[:,0], design_pts[:,1], obs, color='green')
+        plt.title('test_GP_samples_2d')
         plt.show()
         
 def test_check_mem():
@@ -160,7 +166,7 @@ def test_check_mem():
     assert len(GP.X) == 2 * (5 ** 2)
     assert len(GP.Y) == 2 * (5 ** 2)
     
-def test_GP_Brownian_bridge_1d():
+def test_GP_GP_bridge_1d():
     design_pts = GaussianProcess.create_uniform_grid(-2,2,5)
     obs = np.random.normal(size = 5)
     GP = GaussianProcess(design_pts, obs)
@@ -184,9 +190,10 @@ def test_GP_Brownian_bridge_1d():
         plt.plot(X, Y)
         GP.reset()
     plt.plot(design_pts, obs, 'ro')
+    plt.title('test_GP_GP_bridge_1d')
     plt.show()    
     
-def test_GP_Brownian_bridge_2d():
+def test_GP_GP_bridge_2d():
     design_pts = GaussianProcess.create_uniform_grid(-2, 2, 5, 2)
     obs = np.random.randn(5 ** 2)
     GP = GaussianProcess(design_pts, obs)
@@ -208,9 +215,11 @@ def test_GP_Brownian_bridge_2d():
     ax.plot_trisurf(X, Y, Z)
     #Plot the design points
     ax.scatter(design_pts[:,0], design_pts[:,1], obs, color='green')
+    plt.title('test_GP_GP_bridge_2d')
     plt.show()
     
 def test_find_closest_2d():
+    """Green are closen points, red is x, blue dotted are X (not chosen)"""
     X = np.random.uniform(size=(20,2))
     x = np.random.uniform(size=(1,2))
     
@@ -219,9 +228,11 @@ def test_find_closest_2d():
     plt.plot(x[:,0], x[:,1],'ro')
     hull = X[GaussianProcess.find_closest(x,X)]
     plt.plot(hull[:,0], hull[:,1], 'go')
+    plt.title('test_find_closest_2d')
     plt.show()
     
 def test_find_closest_1d():
+    """Green are closen points, red is x, blue dotted are X (not chosen)"""
     X = np.random.uniform(size=(20))
     x = np.random.uniform(size=(1))
     hull = X[GaussianProcess.find_closest(x,X)]
@@ -232,26 +243,27 @@ def test_find_closest_1d():
     plt.eventplot(x, orientation='horizontal', colors='r')
     plt.eventplot(hull, orientation='horizontal', colors='g', linestyles='dashed')
     plt.axis('off')
-
+    
+    plt.title('test_find_closest_1d')
     plt.show()
-    #Green are closen points, red is x, blue dotted are X (not chosen)
+    
         
 if __name__ == '__main__':
 #    test_r2_distance()
-#    test_brownian_bridge()
+#    test_GP_bridge()
 #    test_check_mem()
     
 #    np.random.seed(100)  
 #    test_GP_samples_1d()
 #    np.random.seed(100)
-    test_GP_Brownian_bridge_1d()
+    test_GP_GP_bridge_1d()
 #    np.random.seed(100)
 #    test_GP_interp_1d()
     
 #    np.random.seed(100)
 #    test_GP_samples_2d()
 #    np.random.seed(100)
-#    test_GP_Brownian_bridge_2d()
+#    test_GP_GP_bridge_2d()
 #    np.random.seed(100)
 #    test_GP_interp_2d()
     
