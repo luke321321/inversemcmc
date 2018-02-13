@@ -21,3 +21,10 @@ Simply run
 	python MCMC_A.py
 
 See the above file for different plotting and posterior distribution options.
+
+### Testing ####
+The tests are contained in 
+
+	test_GaussianProcess.py
+Since we're dealing with randomness most of the tests are graphical.
+Simply uncomment the required tests at the bottom of the file.
