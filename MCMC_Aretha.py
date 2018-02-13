@@ -15,7 +15,6 @@ k(x; u) = 1/100 + \sum_j^d u_j/(200(d + 1)) * sin(2\pi jx),
 where u \in [-1,1]^d and the truth u^* is randomly generated."""
 
 import numpy as np
-import math
 import random
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D

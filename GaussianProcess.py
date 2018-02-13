@@ -62,7 +62,7 @@ class GaussianProcess:
             mean = lambda u : self.k(u, points) @ kernel_star_inverse_dot_phi_star
             kernel = lambda u,v: self.k(u, v) - (self.k(v, points) @ kernel_star_inverse
                                 @ self.k(u, points).T)
-        #if only 1 point is given then kernel_star_inverse = 1 and things are scalars
+        #if only 1 point is given then kernel_star_inverse = 1 and objects are scalars
         else:
             mean = lambda u : self.k(u, points) * data
             kernel = lambda u,v: self.k(u, v) - self.k(v, points) * self.k(u, points).T
@@ -99,8 +99,7 @@ class GaussianProcess:
         """Returns a function that is a GP evaluated exactly at the grid points
         and uses linear intepolation to evaluate it at other points
         
-        The returned function is really a vector of functions of size num_evaluations
-        """
+        The returned function is really a vector of functions of size num_evaluations"""
         #TODO: only currently returns 1 evaluation of the GP need to call again for another eval
         if num_evals != 1:
             raise Exception('Not yet implemented')
@@ -133,9 +132,10 @@ class GaussianProcess:
         #first check lengeth of array X and Y and expand if necessary
         self.check_mem()
         
-        #first find closest 2*d points to x
-        #Ideally create RTree but first do naive thing 
-        #runs in O(n) time instead of O(log(n)) for RTree insertion and nearest neighbour
+        """First find closest 2*d points to x
+        Ideally create RTree but first do naive thing.
+        Runs in O(n) time instead of O(log(n)) for RTree insertion and nearest neighbou
+        Really only need smallest convex hull in self.X that contains x"""
         
         #only check distance up to computed values of X - about 1/2 of X is 0s
         dist = self.r2_distance(x, self.X[:self.index])           
@@ -162,7 +162,9 @@ class GaussianProcess:
     @staticmethod
     def find_closest(x, X, dist=None):
         """Finds a closest points of X to x in each signed direction
-        Returns: index an array of lists st closest points are X[index] """
+        Returns: index an array of lists st closest points are X[index] 
+        
+        This is a bottleneck and have just done the naive thing here"""
         
         #if dim = 1 reshape to reuse code
         if len(X.shape) == 1:
