@@ -12,19 +12,14 @@ p(0; u) = 0
 p(1; u) = 10
 
 k(x; u) = 1/100 + \sum_j^d u_j/(200(d + 1)) * sin(2\pi jx),
-where u \in [-1,1]^d and the truth u^* is randomly generated.
+where u \in [-1,1]^d and the truth u^* is randomly generated."""
 
-"""
 import numpy as np
 import math
 import random
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
-#kv is modified Bessel function of second kind
-from scipy.sparse import diags
-from scipy.sparse.linalg import spsolve
-#Quicker sparse LA solver: install via: 'conda install -c haasad pypardiso'
-#from pypardiso import spsolve
+
 #Progress bar
 from tqdm import tqdm
 
@@ -33,6 +28,7 @@ from tqdm import tqdm
 #import pstats
 
 from GaussianProcess import GaussianProcess as gp
+import PDE_Aretha as PDE
 
 #We pass dimension via x0
 def MH_random_walk(density, length, speed=0.5, x0=np.array([0]), burn_time=1000):
@@ -73,107 +69,20 @@ def runMCMC(dens, length, speed_random_walk, x0, x, N):
     """Helper function to start off running MCMC"""
     print('Running MCMC with length:', length, 'and speed:', speed_random_walk)
     accepts, run = MH_random_walk(dens, length, x0=x0, speed=speed_random_walk)
-    #cProfile.runctx('MH_random_walk(density_prior, length, x0=x0, speed=speed_random_walk)'
-    #                , globals(), locals(), '.prof')
-    #s = pstats.Stats('.prof')
-    #s.strip_dirs().sort_stats('time').print_stats(30)
+
     mean = np.sum(run, 0)/length
     print('Mean is:', mean)
     print('We accepted this number of times:', accepts)
-    sol_at_mean = solve_PDE_at_x(mean,N,x)
+    sol_at_mean = PDE.solve_at_x(mean,N,x)
     print('Solution to PDE at mean is:', sol_at_mean)
     return accepts, run
 
-#%% PDE solver code
-def solve_PDE(u,N):
-    """Solves the PDE in (0,1) with coefficients u and
-    N number of Chebyshev interpolant points"""
-    
-    #Boundary condition, p(1; u) = c
-    c = 100.
-    
-    #create N Chebyshev nodes in (0,1)
-    nodes = np.zeros(N+2)
-    nodes[1:-1] = np.cos((2*np.arange(N)+1)*np.pi/(2*N) - np.pi)/2 + 0.5
-    nodes[-1] = 1
-    
-    A, b_bttm = stiffness_matrix(nodes,u)
-    b = cal_B(nodes)
-    
-    #change last entry of b for Dirichlet bdry condition at 1
-    b[-1] = b[-1] + c*b_bttm
-    b = np.append(b, c)
-    
-    #solve the PDE
-    p = spsolve(A, b)
-    
-    #add 0 for the first node
-    p = np.insert(p,0,0)
-    return p, nodes
-
-def stiffness_matrix(nodes, u):
-    """Returns the sparse stiffness matrix from nodes and k(x;u), nodes include enpoints"""
-    
-    #calculate derivative of basis functions - which is just a step function
-    v_L = 1/(nodes[1:] - nodes[:-1])
-    v_R = 1/(nodes[1:] - nodes[:-1])
-    
-    #integrate K between the nodes
-    intK = integral_K(nodes[:-1], nodes[1:], u)
-    
-    #Construct the stiffness matrix
-    diag_0 = (v_L[:-1] ** 2) * intK[:-1] + (v_R[1:] ** 2) * intK[1:]
-    diag_1 = -v_R[1:-1] * v_L[1:-1] * intK[1:-1]
-    
-    #Append values for Dirchlet condition of p(1) = 1
-    diag_0 = np.append(diag_0, 1)
-    diag_1 = np.append(diag_1, 0)
-    
-    #get the value bottom of off diagonal to take from vector b
-    b_bttm = v_R[-1] * v_L[-1] * intK[-1]
-    
-    A = diags([diag_1, diag_0, diag_1], [-1, 0, 1], format="csr")
-    return A, b_bttm
-
-def cal_B(nodes):
-    """Returns the vector b to solve the PDE
-    
-    If want RHS of PDE to be f(x) then change return to
-    f(node[1:-1]) * (nodes[2:] - nodes[:-2])/2 to approximate \int fv using midpoint rule"""
-    
-    return (nodes[2:] - nodes[:-2])/2
-
-def integral_K(a,b,u):
-    """Returns the integral of k(x;u) from a to b, both 1d arrays of the same dimension"""
-    if isinstance(u, np.ndarray):
-        dim_U = u.size
-    else:
-        dim_U = 1
-    
-    #tile arrays to 2d arrays
-    A = np.broadcast_to(a, (dim_U, a.size))
-    B = np.broadcast_to(b, (dim_U, b.size))
-    J = np.broadcast_to(np.arange(dim_U)+1, (a.size, dim_U)).T
-    U = np.broadcast_to(u, (a.size, dim_U)).T
-    
-    #calculate k(x;u) at nodes x
-    to_sum = U*(np.cos(2*np.pi*J*A) - np.cos(2*np.pi*J*B))/(2*np.pi*J)
-    return (b-a)/100 + np.sum(to_sum, axis=0)/(200*(dim_U + 1))
-
-def solve_PDE_at_x(u,N,x):
-    """Solves the PDE in (0,1) with coefficients u and
-    N number of Chebyshev interpolant points, and returns the value of p(x) where 0 < x < 1"""
-    p, nodes = solve_PDE(u,N)
-    i = np.searchsorted(nodes, x)
-    return (p[i-1]*(x - nodes[i-1])+ p[i]*(nodes[i] - x))/(nodes[i] - nodes[i-1])
-
 #%% Setup variables and functions
-#First neeed to generate some data y
-#setup
-        
-sigma = 0.1 #size of noise in observations
-dim_U = 1
-length = 10 ** 4 #length of MCMC
+np.random.seed(3)
+
+sigma = 0.1 #size of the noise in observations
+dim_U = 2
+length = 2 ** 13 #length of MCMC
 num_design_points = 20 #in each dimension
 speed_random_walk = 0.1
 #End points of n-dim lattice for the design points
@@ -189,17 +98,15 @@ x = 0.3
 #Generate data
 #The truth u_dagger lives in [-1,1]
 u_dagger = 2*np.random.rand(dim_U) - 1
-#u_dagger = -0.7
-G_u_dagger = solve_PDE_at_x(u_dagger, N, x)
-#y = G_u_dagger
+G_u_dagger = PDE.solve_at_x(u_dagger, N, x)
 y = np.broadcast_to(G_u_dagger, (num_obs, dim_U)) + sigma*np.random.standard_normal((num_obs, dim_U))
 
 _ROOT2PI = math.sqrt(2*math.pi)
 normal_density = lambda x: math.exp(-np.sum(x ** 2)/2)/_ROOT2PI
-#uniform density for |x[i]| < 1.1
-uniform_density = lambda x: 1*(np.amax(np.abs(x)) <= 1.1)
+#uniform density for |x[i]| < 1
+uniform_density = lambda x: 1*(np.amax(np.abs(x)) <= 1)
 
-phi = lambda u: np.sum((y - solve_PDE_at_x(u,N,x)) ** 2)/(2*sigma*num_obs)
+phi = lambda u: np.sum((y - PDE.solve_at_x(u,N,x)) ** 2)/(2*sigma*num_obs)
 vphi = np.vectorize(phi, signature='(i)->()')
 
 #Create Gaussian Process with exp kernel
@@ -213,7 +120,6 @@ num_interp_points = num_design_points*4
 #u lives in [-1,1] so use uniform dist as prior or could use normal with cutoff |x| < 2 
 density_prior = uniform_density
 density_post = lambda u: np.exp(-GP.mean(u))*uniform_density(u)
-
 
 flag_run_MCMC = 1
 if flag_run_MCMC:
@@ -290,7 +196,7 @@ flag_plot = 0
 if flag_plot:
     plt.figure()
     X = np.linspace(-2,2,40)
-    v_likelihood = np.vectorize(lambda u,y: np.exp(-np.sum((solve_PDE_at_x(y,N,x)-solve_PDE_at_x(u,N,x))**2)/(2*sigma*num_obs)))
+    v_likelihood = np.vectorize(lambda u,y: np.exp(-np.sum((PDE.solve_at_x(y,N,x)-PDE.solve_at_x(u,N,x))**2)/(2*sigma*num_obs)))
     for i in np.linspace(-1,1,5):
         plt.plot(X,v_likelihood(i,X),label=i)
     plt.legend(loc='upper right')
@@ -302,7 +208,7 @@ flag_plot = 0
 if flag_plot:
     plt.figure()
     X = np.linspace(-2,2,40)
-    v_likelihood = np.vectorize(lambda u,y: np.exp(-np.sum((solve_PDE_at_x(y,N,x)-solve_PDE_at_x(u,N,x))**2)/(2*sigma*num_obs)))
+    v_likelihood = np.vectorize(lambda u,y: np.exp(-np.sum((PDE.solve_at_x(y,N,x)-PDE.solve_at_x(u,N,x))**2)/(2*sigma*num_obs)))
     plt.plot(X,v_likelihood(u_dagger,X),label=str(u_dagger))
     plt.legend(loc='upper right')
     plt.title('Likelihood for different truth u_dagger' + str(u_dagger) + ' at x=' + str(x))
@@ -313,21 +219,7 @@ flag_plot = 0
 if flag_plot:
     plt.figure()
     X = np.linspace(-1,1,40)
-    vPDE_at_x = np.vectorize(lambda u: solve_PDE_at_x(u, N, x))
+    vPDE_at_x = np.vectorize(lambda u: PDE.solve_at_x(u, N, x))
     plt.plot(X,vPDE_at_x(X))
     plt.title('Solution to PDE for different parameters')
     plt.show()
-
-    
-#%%Testing code for PDE solver
-#u = np.random.randn(1)
-#N = 100
-#p, nodes = solve_PDE(u,N)
-#plt.figure()
-#plt.plot(nodes,p)
-#plt.show()
-#print('Value at 0.5:', solve_PDE_at_x(u,N,0.5))
-#cProfile.runctx('solve_PDE_at_x(u,N,x)'
-#                , globals(), locals(), '.prof')
-#s = pstats.Stats('.prof')
-#s.strip_dirs().sort_stats('time').print_stats(30)

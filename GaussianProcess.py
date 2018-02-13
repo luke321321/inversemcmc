@@ -60,7 +60,7 @@ class GaussianProcess:
             kernel_star_inverse_dot_phi_star = kernel_star_inverse @ data
 
             mean = lambda u : self.k(u, points) @ kernel_star_inverse_dot_phi_star
-            kernel = lambda u,v: (self.k(u, v) - self.k(v, points) @ kernel_star_inverse
+            kernel = lambda u,v: self.k(u, v) - (self.k(v, points) @ kernel_star_inverse
                                 @ self.k(u, points).T)
         #if only 1 point is given then kernel_star_inverse = 1 and things are scalars
         else:
@@ -219,7 +219,7 @@ class GaussianProcess:
         if len(x.shape) == 1:
             x = x.reshape(1, self.dim)
         all_pts = np.concatenate((x, points))
-        val = np.random.multivariate_normal(mean(all_pts), ker(all_pts, all_pts))
+        val = np.random.multivariate_normal(mean(all_pts), ker(all_pts, all_pts), check_valid='ignore')
         return val[0]
 
 
