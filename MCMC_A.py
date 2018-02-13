@@ -27,7 +27,7 @@ from tqdm import tqdm
 #import pstats
 
 from GaussianProcess import GaussianProcess as gp
-import PDE_Aretha as PDE
+import PDE_A as PDE
 
 #We pass dimension via x0
 def MH_random_walk(density, length, speed=0.5, x0=np.array([0]), burn_time=1000):
