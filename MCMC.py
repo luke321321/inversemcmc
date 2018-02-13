@@ -75,13 +75,11 @@ def runMCMC(dens, length, speed_random_walk, x0, x, N):
     print('We accepted this number of times:', accepts)
     sol_at_mean = PDE.solve_at_x(mean,N,x)
     print('Solution to PDE at mean is:', sol_at_mean)
-    return accepts, run
+    return run
 
 #%% Setup variables and functions
-np.random.seed(3)
-
-sigma = 0.1 #size of the noise in observations
-dim_U = 2
+sigma = 0.05 #size of the noise in observations
+dim_U = 1
 length = 2 ** 13 #length of MCMC
 num_design_points = 20 #in each dimension
 speed_random_walk = 0.1
@@ -93,7 +91,7 @@ num_obs = 25
 #N: number basis functions for solving PDE
 N = 2 ** 12
 #point to solve PDE at
-x = 0.3
+x = 0.4
 
 #Generate data
 #The truth u_dagger lives in [-1,1]
@@ -101,8 +99,6 @@ u_dagger = 2*np.random.rand(dim_U) - 1
 G_u_dagger = PDE.solve_at_x(u_dagger, N, x)
 y = np.broadcast_to(G_u_dagger, (num_obs, dim_U)) + sigma*np.random.standard_normal((num_obs, dim_U))
 
-_ROOT2PI = math.sqrt(2*math.pi)
-normal_density = lambda x: math.exp(-np.sum(x ** 2)/2)/_ROOT2PI
 #uniform density for |x[i]| < 1
 uniform_density = lambda x: 1*(np.amax(np.abs(x)) <= 1)
 
@@ -119,7 +115,6 @@ num_interp_points = num_design_points*4
 #%% Calculations
 #u lives in [-1,1] so use uniform dist as prior or could use normal with cutoff |x| < 2 
 density_prior = uniform_density
-density_post = lambda u: np.exp(-GP.mean(u))*uniform_density(u)
 
 flag_run_MCMC = 1
 if flag_run_MCMC:
@@ -131,24 +126,23 @@ if flag_run_MCMC:
     if 0:
         density_post = lambda u: np.exp(-phi(u))*density_prior(u)
         print('\n True posterior')
-        _, run_true = runMCMC(density_post, length, speed_random_walk, x0, x, N)
+        run_true = runMCMC(density_post, length, speed_random_walk, x0, x, N)
     
     if 0:
         density_post = lambda u: np.exp(-GP.mean(u))*density_prior(u)
         print('\n GP as mean - ie marginal approximation')
-        _, run_mean = runMCMC(density_post, length*10, speed_random_walk, x0, x, N)
+        run_mean = runMCMC(density_post, length*10, speed_random_walk, x0, x, N)
         
     if 1:
         density_post = lambda u: np.exp(-GP.GP_eval(u))*density_prior(u)
         print('\n GP - one evaluation')
-        _, run_GP = runMCMC(density_post, length*10, speed_random_walk, x0, x, N)
+        run_GP = runMCMC(density_post, length*10, speed_random_walk, x0, x, N)
     
     if 0:
         interp = GP.GP(num_interp_points)
         density_post = lambda u: np.exp(-interp(u))*density_prior(u)
         print('\n pi^N_rand via interpolation')
-        _, run_rand = runMCMC(density_post, length*10, speed_random_walk, x0, x, N)
-
+        run_rand = runMCMC(density_post, length*10, speed_random_walk, x0, x, N)
 
 #%% Plotting 
 #Plotting phi and GP of phi:
