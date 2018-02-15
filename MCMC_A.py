@@ -15,6 +15,8 @@ k(x; u) = 1/100 + \sum_j^d u_j/(200(d + 1)) * sin(2\pi jx),
 where u \in [-1,1]^d and the truth u^* is randomly generated."""
 
 import numpy as np
+import pandas as pd
+import seaborn as sns
 import random
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -64,8 +66,9 @@ def MH_random_walk(density, length, speed=0.5, x0=np.array([0]), burn_time=1000)
                 x[i] = x[i-1]
     return accepted_count, x[burn_time:]
 
-def runMCMC(dens, length, speed_random_walk, x0, x, N):
+def runMCMC(dens, length, speed_random_walk, x0, x, N, name):
     """Helper function to start off running MCMC"""
+    print('\n' + name)
     print('Running MCMC with length:', length, 'and speed:', speed_random_walk)
     accepts, run = MH_random_walk(dens, length, x0=x0, speed=speed_random_walk)
 
@@ -74,12 +77,24 @@ def runMCMC(dens, length, speed_random_walk, x0, x, N):
     print('We accepted this number of times:', accepts)
     sol_at_mean = PDE.solve_at_x(mean,N,x)
     print('Solution to PDE at mean is:', sol_at_mean)
+    plot_dist(run, name)
     return run
+
+def plot_dist(dist, title):
+    """Plots the distribution on a grid"""
+    sns.set(color_codes=True)
+    sns.set_style('white')
+    sns.set_style('ticks')
+    g = sns.PairGrid(pd.DataFrame(dist), despine=True)
+    g.map_diag(sns.kdeplot, legend=False)
+    g.map_lower(sns.kdeplot, cmap="Blues_d", n_levels=4)
+    for i, j in zip(*np.triu_indices_from(g.axes, 1)):
+        g.axes[i, j].set_visible(False)
 
 #%% Setup variables and functions
 sigma = 0.05 #size of the noise in observations
-dim_U = 1
-length = 2 ** 13 #length of MCMC
+dim_U = 3
+length = 2 ** 10 #length of MCMC
 num_design_points = 20 #in each dimension
 speed_random_walk = 0.1
 #End points of n-dim lattice for the design points
@@ -124,26 +139,27 @@ if flag_run_MCMC:
     
     if 0:
         density_post = lambda u: np.exp(-phi(u))*density_prior(u)
-        print('\n True posterior')
-        run_true = runMCMC(density_post, length, speed_random_walk, x0, x, N)
+        name = 'True posterior'
+        run_true = runMCMC(density_post, length, speed_random_walk, x0, x, N, name)
     
     if 0:
         density_post = lambda u: np.exp(-GP.mean(u))*density_prior(u)
-        print('\n GP as mean - ie marginal approximation')
-        run_mean = runMCMC(density_post, length*10, speed_random_walk, x0, x, N)
+        name = 'GP as mean - ie marginal approximation'
+        run_mean = runMCMC(density_post, length*10, speed_random_walk, x0, x, N, name)
         
     if 1:
         density_post = lambda u: np.exp(-GP.GP_eval(u))*density_prior(u)
-        print('\n GP - one evaluation')
-        run_GP = runMCMC(density_post, length*10, speed_random_walk, x0, x, N)
+        name = 'GP - one evaluation'
+        run_GP = runMCMC(density_post, length*10, speed_random_walk, x0, x, N, name)
+        plot_dist(run_GP, name)
     
     if 0:
         interp = GP.GP(num_interp_points)
         density_post = lambda u: np.exp(-interp(u))*density_prior(u)
-        print('\n pi^N_rand via interpolation')
-        run_rand = runMCMC(density_post, length*10, speed_random_walk, x0, x, N)
+        name = 'pi^N_rand via interpolation'
+        run_rand = runMCMC(density_post, length*10, speed_random_walk, x0, x, N, name)
 
-#%% Plotting 
+#%% Debugging section:
 #Plotting phi and GP of phi:
 flag_plot = 0
 if flag_plot:      
@@ -171,17 +187,6 @@ if flag_plot:
         #Plot the design points
         ax.scatter(design_points[:,0], design_points[:,1], vphi(design_points), color='green')
         plt.show()
-        
-#%% Plot hist  
-flag_plot = 1
-if flag_plot:
-    plt.figure()
-    if dim_U == 1:
-        plt.hist(run_GP, bins=101, alpha=0.5, density=True, label='Post')
-    else:
-        plt.hist(run_GP[:,0], bins=101, alpha=0.5, density=True, label='Post')
-    plt.legend(loc='upper right')
-    plt.show()
         
 #%% Plot Likelihood:
 #likelihood for debugging and checking problems
