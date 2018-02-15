@@ -20,6 +20,9 @@ def solve(k, N):
     """Solves the PDE in (0,1) with coefficients k and
     N number of Chebyshev interpolant points"""
     
+    #Make sure k_0 = 1 or however many dimesions we are not searching for
+    k = np.concatenate((np.ones(10-k.shape[0]), k))
+    
     #Boundary condition, p(1; u) = c
     c = 1.
     
@@ -86,20 +89,18 @@ def integral_K(a, b, k):
 def solve_at_x(k, N, x):
     """Solves the PDE in (0,1) with coefficients k and
     N number of Chebyshev interpolant points, and returns the value of u(x) where 0 < x < 1"""
-    #Make sure k_0 = 1
-    k = np.insert(k, 0, 1)
     p, nodes = solve(k, N)
     i = np.searchsorted(nodes, x)
     return (p[i-1]*(x - nodes[i-1])+ p[i]*(nodes[i] - x))/(nodes[i] - nodes[i-1])
 
 #%%Testing code for PDE solver
-k = np.random.lognormal(size=10)
-N = 10000
-u, nodes = solve(k, N)
-plt.figure()
-plt.plot(nodes, u)
-plt.show()
-print('Value at 0.5:', solve_at_x(k, N, 0.5))
+#k = np.random.lognormal(size=4)
+#N = 10000
+#u, nodes = solve(k, N)
+#plt.figure()
+#plt.plot(nodes, u)
+#plt.show()
+#print('Value at 0.5:', solve_at_x(k, N, 0.5))
 #cProfile.runctx('solve_at_x(u,N,0.25)'
 #                , globals(), locals(), '.prof')
 #s = pstats.Stats('.prof')

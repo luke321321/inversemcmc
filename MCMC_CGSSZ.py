@@ -29,14 +29,14 @@ from MCMC import runMCMC
 
 #%% Setup variables and functions
 sigma = np.sqrt(10 ** -5) #size of the noise in observations
-dim_k = 9
+dim_k = 4
 length = 10 ** 4 #length of MCMC
 num_design_points = 20 #in each dimension
 speed_random_walk = 0.1
 num_obs = 1
 
 #N: number basis functions for solving PDE
-N = 10 ** 4
+N = 10 ** 3
 #points to solve PDE at
 x = np.arange(1,10)/10
 
@@ -45,7 +45,7 @@ x = np.arange(1,10)/10
 k_dagger = np.random.lognormal(size=dim_k)
 #sol u for k_dagger at points x
 G_k_dagger = PDE.solve_at_x(k_dagger, N, x)
-y = G_k_dagger + np.random.normal(scale=sigma, size=dim_k)
+y = G_k_dagger + np.random.normal(scale=sigma, size=x.shape[0])
 
 #for mean 0, var 1
 _ROOT2PI = np.sqrt(2*np.pi)
@@ -57,6 +57,8 @@ vphi = np.vectorize(phi, signature='(i)->()')
 
 #Have the design_points so they are log normally distributed ie do inverse of cdf
 design_points = gp.create_uniform_grid(0, 1-1/num_design_points, num_design_points, dim_k)
+design_points = lognorm.ppf(design_points,1)
+
 #Create Gaussian Process with exp kernel
 GP = gp(design_points, vphi(design_points))
 
