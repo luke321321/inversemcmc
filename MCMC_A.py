@@ -83,11 +83,10 @@ def runMCMC(dens, length, speed_random_walk, x0, x, N, name):
 def plot_dist(dist, title):
     """Plots the distribution on a grid"""
     sns.set(color_codes=True)
-    sns.set_style('white')
     sns.set_style('ticks')
     g = sns.PairGrid(pd.DataFrame(dist), despine=True)
     g.map_diag(sns.kdeplot, legend=False)
-    g.map_lower(sns.kdeplot, cmap="Blues_d", n_levels=4)
+    g.map_lower(sns.kdeplot, cmap="Blues_d", n_levels=6)
     for i, j in zip(*np.triu_indices_from(g.axes, 1)):
         g.axes[i, j].set_visible(False)
 
