@@ -47,7 +47,7 @@ def MH_random_walk(density, length, speed=0.5, x0=np.array([0]), burn_time=1000)
     
     x[0] = x0
     density_old = density(x0)
-    for i in tqdm(range(1,burn_time + length)):
+    for i in tqdm(range(1, burn_time + length)):
         y = x[i-1] + rvNormal[i]
         if(density_old == 0): #Accept whatever
             x[i] = y
@@ -94,16 +94,16 @@ def plot_dist(dist, title):
 #%% Setup variables and functions
 sigma = 0.05 #size of the noise in observations
 dim_U = 3
-length = 2 ** 10 #length of MCMC
+length = 2 ** 13 #length of MCMC
 num_design_points = 20 #in each dimension
 speed_random_walk = 0.1
 #End points of n-dim lattice for the design points
 min_range = -1
 max_range = 1
-num_obs = 25
+num_obs = 20
 
 #N: number basis functions for solving PDE
-N = 2 ** 12
+N = 2 ** 10
 #point to solve PDE at
 x = 0.4
 
@@ -124,7 +124,7 @@ design_points = gp.create_uniform_grid(min_range, max_range, num_design_points, 
 GP = gp(design_points, vphi(design_points))
     
 #Grid points to interpolate with
-num_interp_points = num_design_points*4
+num_interp_points = 4 * num_design_points
 
 #%% Calculations
 #u lives in [-1,1] so use uniform dist as prior or could use normal with cutoff |x| < 2 
@@ -151,7 +151,6 @@ if flag_run_MCMC:
         density_post = lambda u: np.exp(-GP.GP_eval(u))*density_prior(u)
         name = 'GP - one evaluation'
         run_GP = runMCMC(density_post, length*10, speed_random_walk, x0, x, N, name)
-        plot_dist(run_GP, name)
     
     if 0:
         interp = GP.GP(num_interp_points)
