@@ -3,6 +3,9 @@ In particular we use the Gaussian Process Emulator during a simple MCMC estimati
 This example is modified from section 5 of this [paper](http://dx.doi.org/10.1090/mcom/3244) (also available on [arXiv](https://arxiv.org/abs/1603.02004)).
 I modified boundary conditions to make the solution map 'more one-to-one'.
 
+Note because the code currently has a naive way of searching spatial data it runs in `O(d*n^2)`, where `n` is length of MCMC and `d` is the dimension of the parameter space.
+Using an R* Tree (or another data structure) should reduce this down to `O(d*n*log(n))`.
+
 ### How do I get set up? ###
 
 Required dependencies:
