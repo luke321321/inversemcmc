@@ -15,14 +15,8 @@ k(x; u) = 1/100 + \sum_j^d u_j/(200(d + 1)) * sin(2\pi jx),
 where u \in [-1,1]^d and the truth u^* is randomly generated."""
 
 import numpy as np
-import pandas as pd
-import seaborn as sns
-import random
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
-
-#Progress bar
-from tqdm import tqdm
 
 #import timeit
 #import cProfile
@@ -30,76 +24,18 @@ from tqdm import tqdm
 
 from GaussianProcess import GaussianProcess as gp
 import PDE_A as PDE
-
-#We pass dimension via x0
-def MH_random_walk(density, length, speed=0.5, x0=np.array([0]), burn_time=1000):
-    #Calculate dim of parameter space
-    if isinstance(x0, np.ndarray):
-        dim = x0.size
-    else:
-        dim = 1
-        
-    x = np.zeros((burn_time + length, dim))
-    #Pre-generates the normal rv in R^n
-    rvNormal = speed*np.random.normal(size=(burn_time + length, dim))
-    
-    accepted_count = 0
-    
-    x[0] = x0
-    density_old = density(x0)
-    for i in tqdm(range(1, burn_time + length)):
-        y = x[i-1] + rvNormal[i]
-        if(density_old == 0): #Accept whatever
-            x[i] = y
-            density_old = density(y)
-            if i > burn_time:
-                accepted_count += 1
-        else:
-            u = random.random()
-            density_new = density(y)
-            if(u <= min(1,density_new/density_old)): #check acceptance
-                x[i] = y
-                density_old = density_new
-                if i > burn_time:
-                    accepted_count += 1
-            else:
-                x[i] = x[i-1]
-    return accepted_count, x[burn_time:]
-
-def runMCMC(dens, length, speed_random_walk, x0, x, N, name):
-    """Helper function to start off running MCMC"""
-    print('\n' + name)
-    print('Running MCMC with length:', length, 'and speed:', speed_random_walk)
-    accepts, run = MH_random_walk(dens, length, x0=x0, speed=speed_random_walk)
-
-    mean = np.sum(run, 0)/length
-    print('Mean is:', mean)
-    print('We accepted this number of times:', accepts)
-    sol_at_mean = PDE.solve_at_x(mean,N,x)
-    print('Solution to PDE at mean is:', sol_at_mean)
-    plot_dist(run, name)
-    return run
-
-def plot_dist(dist, title):
-    """Plots the distribution on a grid"""
-    sns.set(color_codes=True)
-    sns.set_style('ticks')
-    g = sns.PairGrid(pd.DataFrame(dist), despine=True)
-    g.map_diag(sns.kdeplot, legend=False)
-    g.map_lower(sns.kdeplot, cmap="Blues_d", n_levels=6)
-    for i, j in zip(*np.triu_indices_from(g.axes, 1)):
-        g.axes[i, j].set_visible(False)
+from MCMC import runMCMC
 
 #%% Setup variables and functions
-sigma = 0.05 #size of the noise in observations
+sigma = np.sqrt(10 ** -3) #size of the noise in observations
 dim_U = 3
-length = 2 ** 13 #length of MCMC
+length = 10 ** 5 #length of MCMC
 num_design_points = 20 #in each dimension
 speed_random_walk = 0.1
 #End points of n-dim lattice for the design points
 min_range = -1
 max_range = 1
-num_obs = 20
+num_obs = 10
 
 #N: number basis functions for solving PDE
 N = 2 ** 10
@@ -115,7 +51,7 @@ y = np.broadcast_to(G_u_dagger, (num_obs, dim_U)) + sigma*np.random.standard_nor
 #uniform density for |x[i]| < 1
 uniform_density = lambda x: 1*(np.amax(np.abs(x)) <= 1)
 
-phi = lambda u: np.sum((y - PDE.solve_at_x(u,N,x)) ** 2)/(2*sigma*num_obs)
+phi = lambda u: np.sum((y - PDE.solve_at_x(u,N,x)) ** 2)/(2*sigma)
 vphi = np.vectorize(phi, signature='(i)->()')
 
 #Create Gaussian Process with exp kernel
@@ -129,6 +65,9 @@ num_interp_points = 4 * num_design_points
 #u lives in [-1,1] so use uniform dist as prior or could use normal with cutoff |x| < 2 
 density_prior = uniform_density
 
+def MCMC_helper(density_post, name):
+    return runMCMC(density_post, length, speed_random_walk, x0, x, N, name, PDE)
+
 flag_run_MCMC = 1
 if flag_run_MCMC:
     x0 = np.zeros(dim_U)
@@ -139,23 +78,23 @@ if flag_run_MCMC:
     if 0:
         density_post = lambda u: np.exp(-phi(u))*density_prior(u)
         name = 'True posterior'
-        run_true = runMCMC(density_post, length, speed_random_walk, x0, x, N, name)
+        run_true = MCMC_helper(density_post, name)
     
     if 0:
         density_post = lambda u: np.exp(-GP.mean(u))*density_prior(u)
         name = 'GP as mean - ie marginal approximation'
-        run_mean = runMCMC(density_post, length*10, speed_random_walk, x0, x, N, name)
+        run_mean = MCMC_helper(density_post, name)
         
     if 1:
         density_post = lambda u: np.exp(-GP.GP_eval(u))*density_prior(u)
         name = 'GP - one evaluation'
-        run_GP = runMCMC(density_post, length*10, speed_random_walk, x0, x, N, name)
+        run_GP = MCMC_helper(density_post, name)
     
     if 0:
         interp = GP.GP(num_interp_points)
         density_post = lambda u: np.exp(-interp(u))*density_prior(u)
         name = 'pi^N_rand via interpolation'
-        run_rand = runMCMC(density_post, length*10, speed_random_walk, x0, x, N, name)
+        run_rand = MCMC_helper(density_post, name)
 
 #%% Debugging section:
 #Plotting phi and GP of phi:
