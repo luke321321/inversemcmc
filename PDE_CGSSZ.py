@@ -1,9 +1,12 @@
-"""PDE Solving code for solving following PDE in p:
+"""
+PDE solving code for solving following PDE in p:
 -d/dx (k(x) du/dx(x; k)) = 4x in (0,1)
 u(0; k) = 0
 u(1; k) = 1
 
-log(k(x))  piecewise constant over 10 equally spaced intervals"""
+log(k(x))  piecewise constant over 10 equally spaced intervals
+with k_0 = 1
+"""
 
 
 import numpy as np
@@ -83,6 +86,8 @@ def integral_K(a, b, k):
 def solve_at_x(k, N, x):
     """Solves the PDE in (0,1) with coefficients k and
     N number of Chebyshev interpolant points, and returns the value of u(x) where 0 < x < 1"""
+    #Make sure k_0 = 1
+    k = np.insert(k, 0, 1)
     p, nodes = solve(k, N)
     i = np.searchsorted(nodes, x)
     return (p[i-1]*(x - nodes[i-1])+ p[i]*(nodes[i] - x))/(nodes[i] - nodes[i-1])

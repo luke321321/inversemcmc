@@ -58,6 +58,7 @@ def runMCMC(dens, length, speed_random_walk, x0, x, N, name, PDE):
     sol_at_mean = PDE.solve_at_x(mean, N, x)
     print('Solution to PDE at mean is:', sol_at_mean)
     plot_dist(run, name)
+    np.save("MCMC_run.npy", run)
     return run
 
 def plot_dist(dist, title):
@@ -66,6 +67,7 @@ def plot_dist(dist, title):
     sns.set_style('ticks')
     g = sns.PairGrid(pd.DataFrame(dist), despine=True)
     g.map_diag(sns.kdeplot, legend=False)
-    g.map_lower(sns.kdeplot, cmap="Blues_d", n_levels=6)
+    g.map_lower(sns.kdeplot, cmap="Blues_d", n_levels=5)
     for i, j in zip(*np.triu_indices_from(g.axes, 1)):
         g.axes[i, j].set_visible(False)
+    g.savefig("output.png")
