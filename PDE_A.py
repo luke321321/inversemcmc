@@ -12,6 +12,8 @@ from scipy.sparse.linalg import spsolve
 #Quicker sparse LA solver: install via: 'conda install -c haasad pypardiso'
 #from pypardiso import spsolve
 
+import matplotlib.pyplot as plt
+
 def solve(u,N):
     """Solves the PDE in (0,1) with coefficients u and
     N number of Chebyshev interpolant points"""
@@ -95,14 +97,14 @@ def solve_at_x(u,N,x):
     return (p[i-1]*(x - nodes[i-1])+ p[i]*(nodes[i] - x))/(nodes[i] - nodes[i-1])
 
 #%%Testing code for PDE solver
-#u = np.random.randn(1)
+#u = np.random.randn(size=5)
 #N = 100
-#p, nodes = solve_PDE(u,N)
+#p, nodes = solve(u,N)
 #plt.figure()
 #plt.plot(nodes,p)
 #plt.show()
-#print('Value at 0.5:', solve_PDE_at_x(u,N,0.5))
-#cProfile.runctx('solve_PDE_at_x(u,N,x)'
+#print('Value at 0.5:', solve_at_x(u,N,0.5))
+#cProfile.runctx('solve_at_x(u,N,x)'
 #                , globals(), locals(), '.prof')
 #s = pstats.Stats('.prof')
 #s.strip_dirs().sort_stats('time').print_stats(30)
