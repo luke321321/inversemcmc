@@ -20,8 +20,8 @@ def solve(k, N):
     """Solves the PDE in (0,1) with coefficients k and
     N number of Chebyshev interpolant points"""
     
-    #Make sure k_0 = 1 or however many dimesions we are not searching for
-    k = np.concatenate((np.ones(10-k.shape[0]), k))
+    #Make sure k_0 = 1 (or however many dimesions we are not searching for)
+    k_full = np.concatenate((np.ones(10-k.shape[0]), k))
     
     #Boundary condition, p(1; u) = c
     c = 1.
@@ -31,7 +31,7 @@ def solve(k, N):
     nodes[1:-1] = np.cos((2*np.arange(N)+1)*np.pi/(2*N) - np.pi)/2 + 0.5
     nodes[-1] = 1
     
-    A, b_bttm = stiffness_matrix(nodes, k)
+    A, b_bttm = stiffness_matrix(nodes, k_full)
     b = cal_B(nodes)
     
     #change last entry of b for Dirichlet bdry condition at 1
@@ -50,7 +50,7 @@ def stiffness_matrix(nodes, k):
     
     #calculate derivative of basis functions - which is just a step function
     v_L = 1/(nodes[1:] - nodes[:-1])
-    v_R = 1/(nodes[1:] - nodes[:-1])
+    v_R = v_L
     
     #integrate K between the nodes
     intK = integral_K(nodes[:-1], nodes[1:], k)
@@ -59,7 +59,7 @@ def stiffness_matrix(nodes, k):
     diag_0 = (v_L[:-1] ** 2) * intK[:-1] + (v_R[1:] ** 2) * intK[1:]
     diag_1 = -v_R[1:-1] * v_L[1:-1] * intK[1:-1]
     
-    #Append values for Dirchlet condition of p(1) = 1
+    #Append values for Dirchlet condition of u(1) = c
     diag_0 = np.append(diag_0, 1)
     diag_1 = np.append(diag_1, 0)
     

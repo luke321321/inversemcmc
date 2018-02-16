@@ -28,58 +28,49 @@ import PDE_CGSSZ as PDE
 from MCMC import runMCMC
 
 #%% Setup variables and functions
-sigma = np.sqrt(10 ** -5) #size of the noise in observations
-dim_k = 4
-length = 10 ** 4 #length of MCMC
+sigma = np.sqrt(10 ** -2) #size of the noise in observations
+dim_k = 3
+length = int(10 ** 4) #length of MCMC
+burn_time = 3000
 num_design_points = 20 #in each dimension
-speed_random_walk = 0.1
-num_obs = 1
-
+speed_random_walk = 10 ** -1
+num_obs = 10
+#num_obs evenly spaced points in (0,1)
+x = np.arange(1, num_obs + 1)/(num_obs + 1)
 #N: number basis functions for solving PDE
-N = 10 ** 3
-#points to solve PDE at
-x = np.arange(1,10)/10
+N = 2 ** 7
 
 #Generate data
 #The truth u_dagger
 k_dagger = np.random.lognormal(size=dim_k)
 #sol u for k_dagger at points x
 G_k_dagger = PDE.solve_at_x(k_dagger, N, x)
-y = G_k_dagger + np.random.normal(scale=sigma, size=x.shape[0])
+y = G_k_dagger + sigma*np.random.normal(size=num_obs)
 
-#for mean 0, var 1
-_ROOT2PI = np.sqrt(2*np.pi)
-lognormal_density = lambda x: np.exp(-0.5* np.square(np.log(x))) / (x*_ROOT2PI)
-
-phi = lambda u: np.sum((y - PDE.solve_at_x(u,N,x)) ** 2)/(2*sigma)
+phi = lambda k: np.sum((y - PDE.solve_at_x(k, N, x)) ** 2)/(2*(sigma**2))
 vphi = np.vectorize(phi, signature='(i)->()')
 
-
 #Have the design_points so they are log normally distributed ie do inverse of cdf
-design_points = gp.create_uniform_grid(0, 1-1/num_design_points, num_design_points, dim_k)
-design_points = lognorm.ppf(design_points,1)
+#can't have all 0's being a design point otherwise PDE isn't solvable
+design_points = gp.create_uniform_grid(1e-14, 1-1/num_design_points, num_design_points, dim_k)
+design_points = lognorm.ppf(design_points, 1)
 
 #Create Gaussian Process with exp kernel
 GP = gp(design_points, vphi(design_points))
 
-    
-#Grid points to interpolate with
-num_interp_points = 4 * num_design_points
-
 #%% Calculations
-#u lives in [-1,1] so use uniform dist as prior or could use normal with cutoff |x| < 2 
-density_prior = lognormal_density
+density_prior = lambda u: lognorm.pdf(np.sum(u), 1)
 
 def MCMC_helper(density_post, name):
-    return runMCMC(density_post, length, speed_random_walk, x0, x, N, name, PDE)
+    return runMCMC(density_post, length, speed_random_walk, x0, x, N, name, PDE, G_k_dagger, y, burn=burn_time)
 
 flag_run_MCMC = 1
 if flag_run_MCMC:
     #let x0 be the mean of lognormal(0, 1)
     x0 = np.exp(np.ones(dim_k)/2)
     print('Parameter is:', k_dagger)
-    print('Solution to PDE at',x,'for true parameter is:', G_k_dagger)
-    print('Mean of y for', num_obs,'observations is:', np.sum(y)/(num_obs*dim_k))
+    print('Solution to PDE at',x,'for true parameter is:')
+    print(G_k_dagger)    
     
     if 0:
         density_post = lambda u: np.exp(-phi(u))*density_prior(u)
@@ -97,6 +88,8 @@ if flag_run_MCMC:
         run_GP = MCMC_helper(density_post, name)
     
     if 0:
+        #Grid points to interpolate with
+        num_interp_points = 4 * num_design_points
         interp = GP.GP(num_interp_points)
         density_post = lambda u: np.exp(-interp(u))*density_prior(u)
         name = 'pi^N_rand via interpolation'
