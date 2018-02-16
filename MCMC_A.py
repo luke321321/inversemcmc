@@ -9,7 +9,7 @@ Tricky bit: don't know the points will call GP beforehand so have to generate th
 PDE in p is:
 -d/dx (k(x; u) dp/dx(x; u)) = 1 in (0,1)
 p(0; u) = 0
-p(1; u) = 10
+p(1; u) = 30
 
 k(x; u) = 1/100 + \sum_j^d u_j/(200(d + 1)) * sin(2\pi jx),
 where u \in [-1,1]^d and the truth u^* is randomly generated."""
@@ -27,18 +27,20 @@ import PDE_A as PDE
 from MCMC import runMCMC
 
 #%% Setup variables and functions
-sigma = np.sqrt(10 ** -3) #size of the noise in observations
+sigma = np.sqrt(0.1) #size of the noise in observations
 dim_U = 3
 length = 10 ** 5 #length of MCMC
+burn_time = 2000
 num_design_points = 20 #in each dimension
-speed_random_walk = 0.1
+speed_random_walk = 0.2
 #End points of n-dim lattice for the design points
 min_range = -1
 max_range = 1
-num_obs = 10
+num_obs = 5
+
 
 #N: number basis functions for solving PDE
-N = 2 ** 10
+N = 10 ** 3
 #point to solve PDE at
 x = 0.4
 
@@ -51,22 +53,19 @@ y = np.broadcast_to(G_u_dagger, (num_obs, dim_U)) + sigma*np.random.standard_nor
 #uniform density for |x[i]| < 1
 uniform_density = lambda x: 1*(np.amax(np.abs(x)) <= 1)
 
-phi = lambda u: np.sum((y - PDE.solve_at_x(u,N,x)) ** 2)/(2*sigma)
+phi = lambda u: np.sum((y - PDE.solve_at_x(u, N, x)) ** 2)/(2*(sigma**2))
 vphi = np.vectorize(phi, signature='(i)->()')
 
 #Create Gaussian Process with exp kernel
 design_points = gp.create_uniform_grid(min_range, max_range, num_design_points, dim_U)
 GP = gp(design_points, vphi(design_points))
-    
-#Grid points to interpolate with
-num_interp_points = 4 * num_design_points
 
 #%% Calculations
 #u lives in [-1,1] so use uniform dist as prior or could use normal with cutoff |x| < 2 
 density_prior = uniform_density
 
 def MCMC_helper(density_post, name):
-    return runMCMC(density_post, length, speed_random_walk, x0, x, N, name, PDE)
+    return runMCMC(density_post, length, speed_random_walk, x0, x, N, name, PDE, burn=burn_time)
 
 flag_run_MCMC = 1
 if flag_run_MCMC:
@@ -91,6 +90,8 @@ if flag_run_MCMC:
         run_GP = MCMC_helper(density_post, name)
     
     if 0:
+        #Grid points to interpolate with
+        num_interp_points = 4 * num_design_points
         interp = GP.GP(num_interp_points)
         density_post = lambda u: np.exp(-interp(u))*density_prior(u)
         name = 'pi^N_rand via interpolation'
@@ -130,10 +131,10 @@ if flag_plot:
 flag_plot = 0
 if flag_plot:
     plt.figure()
-    X = np.linspace(-2,2,40)
-    v_likelihood = np.vectorize(lambda u,y: np.exp(-np.sum((PDE.solve_at_x(y,N,x)-PDE.solve_at_x(u,N,x))**2)/(2*sigma*num_obs)))
+    Y = np.linspace(-1.1, 1.1, 40)
+    v_likelihood = np.vectorize(lambda u,y: np.exp(-np.sum((PDE.solve_at_x(y,N,x)-PDE.solve_at_x(u,N,x))**2)/(2*(sigma**2))))
     for i in np.linspace(-1,1,5):
-        plt.plot(X,v_likelihood(i,X),label=i)
+        plt.plot(Y,v_likelihood(i,Y),label=i)
     plt.legend(loc='upper right')
     plt.title('Likelihood for different truths u_dagger' + ' at x=' + str(x))
     plt.show()
@@ -142,11 +143,11 @@ if flag_plot:
 flag_plot = 0
 if flag_plot:
     plt.figure()
-    X = np.linspace(-2,2,40)
-    v_likelihood = np.vectorize(lambda u,y: np.exp(-np.sum((PDE.solve_at_x(y,N,x)-PDE.solve_at_x(u,N,x))**2)/(2*sigma*num_obs)))
-    plt.plot(X,v_likelihood(u_dagger,X),label=str(u_dagger))
+    X = np.linspace(-1.1, 1.1, 40)
+    v_likelihood = np.vectorize(lambda u,y: np.exp(-np.sum((PDE.solve_at_x(y,N,x)-PDE.solve_at_x(u,N,x))**2)/(2*(sigma**2))))
+    plt.plot(X,v_likelihood(u_dagger[0], X),label=str(u_dagger[0]))
     plt.legend(loc='upper right')
-    plt.title('Likelihood for different truth u_dagger' + str(u_dagger) + ' at x=' + str(x))
+    plt.title('Likelihood for different truth u_dagger=' + str(u_dagger[0]) + ' at x=' + str(x))
     plt.show()
         
 #%% Plot solution to PDE at different parameters

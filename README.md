@@ -18,8 +18,8 @@ Optional dependencies:
 
 If you don't have the optional dependencies installed then the code can be simply modified as follows.
 
-`tqdm` is only used to give a progress bar for the MCMC run in `MCMC_A.py`.
-To remove this dependency just replace the line (currently `48`) in `MCMC_A.py`
+`tqdm` is only used to give a progress bar for the MCMC run in `MCMC.py`.
+To remove this dependency just replace the line (currently `line 30`) in `MCMC.py`
 
 ```python
 	for i in tqdm(range(1,burn_time + length)):

@@ -37,7 +37,7 @@ def MH_random_walk(density, length, speed=0.5, x0=np.array([0]), burn_time=1000)
         else:
             u = random.random()
             density_new = density(y)
-            if(u <= min(1,density_new/density_old)): #check acceptance
+            if(u <= min(1, density_new/density_old)): #check acceptance
                 x[i] = y
                 density_old = density_new
                 if i > burn_time:
@@ -46,11 +46,11 @@ def MH_random_walk(density, length, speed=0.5, x0=np.array([0]), burn_time=1000)
                 x[i] = x[i-1]
     return accepted_count, x[burn_time:]
 
-def runMCMC(dens, length, speed_random_walk, x0, x, N, name, PDE):
+def runMCMC(dens, length, speed_random_walk, x0, x, N, name, PDE, burn=1000):
     """Helper function to start off running MCMC"""
     print('\n' + name)
     print('Running MCMC with length:', length, 'and speed:', speed_random_walk)
-    accepts, run = MH_random_walk(dens, length, x0=x0, speed=speed_random_walk)
+    accepts, run = MH_random_walk(dens, length, x0=x0, speed=speed_random_walk, burn_time=burn)
 
     mean = np.sum(run, 0)/length
     print('Mean is:', mean)

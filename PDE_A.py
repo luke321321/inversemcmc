@@ -1,7 +1,7 @@
 """PDE Solving code for solving following PDE in p:
 -d/dx (k(x; u) dp/dx(x; u)) = 1 in (0,1)
 p(0; u) = 0
-p(1; u) = 10
+p(1; u) = 30
 
 k(x; u) = 1/100 + \sum_j^d u_j/(200(d + 1)) * sin(2\pi jx)"""
 
@@ -19,7 +19,7 @@ def solve(u,N):
     N number of Chebyshev interpolant points"""
     
     #Boundary condition, p(1; u) = c
-    c = 100.
+    c = 30.
     
     #create N Chebyshev nodes in (0,1)
     nodes = np.zeros(N+2)
@@ -97,7 +97,7 @@ def solve_at_x(u,N,x):
     return (p[i-1]*(x - nodes[i-1])+ p[i]*(nodes[i] - x))/(nodes[i] - nodes[i-1])
 
 #%%Testing code for PDE solver
-#u = np.random.randn(size=5)
+#u = np.random.randn(size=3)
 #N = 100
 #p, nodes = solve(u,N)
 #plt.figure()
