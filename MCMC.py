@@ -46,7 +46,7 @@ def MH_random_walk(density, length, speed=0.5, x0=np.array([0]), burn_time=1000)
                 x[i] = x[i-1]
     return accepted_count, x[burn_time:]
 
-def runMCMC(dens, length, speed_random_walk, x0, x, N, name, PDE, burn=1000):
+def runMCMC(dens, length, speed_random_walk, x0, x, N, name, PDE, sol_true, sol_obs, burn=1000):
     """Helper function to start off running MCMC"""
     print('\n' + name)
     print('Running MCMC with length:', length, 'and speed:', speed_random_walk)
@@ -56,7 +56,11 @@ def runMCMC(dens, length, speed_random_walk, x0, x, N, name, PDE, burn=1000):
     print('Mean is:', mean)
     print('We accepted this number of times:', accepts)
     sol_at_mean = PDE.solve_at_x(mean, N, x)
-    print('Solution to PDE at mean is:', sol_at_mean)
+    print('Solution to PDE at mean is:')
+    print(sol_at_mean)
+    
+    print('Average error from true values is:', np.sqrt(np.sum((sol_at_mean - sol_true)**2))/len(x))
+    print('Average error from observed values is:', np.sqrt(np.sum((sol_at_mean - sol_obs)**2))/len(x))
     plot_dist(run, name)
     np.save("MCMC_run.npy", run)
     return run

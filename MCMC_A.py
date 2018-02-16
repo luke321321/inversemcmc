@@ -9,10 +9,14 @@ Tricky bit: don't know the points will call GP beforehand so have to generate th
 PDE in p is:
 -d/dx (k(x; u) dp/dx(x; u)) = 1 in (0,1)
 p(0; u) = 0
-p(1; u) = 30
+p(1; u) = 0
 
 k(x; u) = 1/100 + \sum_j^d u_j/(200(d + 1)) * sin(2\pi jx),
-where u \in [-1,1]^d and the truth u^* is randomly generated."""
+where u \in [-1,1]^d and the truth u^* is randomly generated.
+
+We have 15 equally spaced observations in (0,1) of the solution with
+error ~ N(0,I).
+"""
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -27,29 +31,27 @@ import PDE_A as PDE
 from MCMC import runMCMC
 
 #%% Setup variables and functions
-sigma = np.sqrt(0.1) #size of the noise in observations
+sigma = np.sqrt(10 ** 0) #size of the noise in observations
 dim_U = 3
 length = 10 ** 5 #length of MCMC
-burn_time = 2000
+burn_time = 1000
 num_design_points = 20 #in each dimension
-speed_random_walk = 0.2
+speed_random_walk = 0.1
 #End points of n-dim lattice for the design points
 min_range = -1
 max_range = 1
-num_obs = 5
-
+num_obs = 15
+#num_obs evenly spaced points in (0,1)
+x = np.arange(1, num_obs+1)/(num_obs + 1)
 
 #N: number basis functions for solving PDE
-N = 10 ** 3
-#point to solve PDE at
-x = 0.4
+N = 2 ** 10
 
 #Generate data
 #The truth u_dagger lives in [-1,1]
 u_dagger = 2*np.random.rand(dim_U) - 1
 G_u_dagger = PDE.solve_at_x(u_dagger, N, x)
-y = np.broadcast_to(G_u_dagger, (num_obs, dim_U)) + sigma*np.random.standard_normal((num_obs, dim_U))
-
+y = G_u_dagger + sigma*np.random.normal(size=num_obs)
 #uniform density for |x[i]| < 1
 uniform_density = lambda x: 1*(np.amax(np.abs(x)) <= 1)
 
@@ -65,14 +67,16 @@ GP = gp(design_points, vphi(design_points))
 density_prior = uniform_density
 
 def MCMC_helper(density_post, name):
-    return runMCMC(density_post, length, speed_random_walk, x0, x, N, name, PDE, burn=burn_time)
+    return runMCMC(density_post, length, speed_random_walk, x0, x, N, name, PDE, G_u_dagger, y, burn=burn_time)
 
 flag_run_MCMC = 1
 if flag_run_MCMC:
     x0 = np.zeros(dim_U)
     print('Parameter is:', u_dagger)
-    print('Solution to PDE at',x,'for true parameter is:', G_u_dagger)
-    print('Mean of y for', num_obs,'observations is:', np.sum(y)/(num_obs*dim_U))
+    print('Solution to PDE at', x, 'for true parameter is:')
+    print(G_u_dagger)
+    print('Observation of solution to PDE at', x, 'is:')
+    print(y)
     
     if 0:
         density_post = lambda u: np.exp(-phi(u))*density_prior(u)
