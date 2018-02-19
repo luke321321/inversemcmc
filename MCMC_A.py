@@ -21,6 +21,7 @@ error ~ N(0,I).
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+import os
 
 from GaussianProcess import GaussianProcess as gp
 import PDE_A as PDE
@@ -33,14 +34,17 @@ def MCMC_helper(density_post, name, short_name):
 def save_data(run, short_name):
     mean = np.sum(run, 0)/length
     sol_at_mean = PDE.solve_at_x(mean, N, x)
-    np.savez_compressed('output_A_' + short_name, run=run, u_dagger=u_dagger,
+    np.savez_compressed('output/A_' + short_name, run=run, u_dagger=u_dagger,
                         G_u_dagger=G_u_dagger, y=y, sol_at_mean=sol_at_mean, dim_U=dim_U,
                         length=length, sigma=sigma, burn_time=burn_time,
                         speed_random_walk=speed_random_walk, num_obs=num_obs, N=N,
                         num_design_points=num_design_points)
 
+#Make output directory
+os.makedirs('output', exist_ok=True)
+
 #%% Setup variables and functions
-sigma = np.sqrt(10 ** 0) #size of the noise in observations
+sigma = np.sqrt(10 ** -1) #size of the noise in observations
 dim_U = 3
 length = 10 ** 5 #length of MCMC
 burn_time = 1000
@@ -60,7 +64,8 @@ N = 2 ** 10
 #The truth u_dagger lives in [-1,1]
 u_dagger = 2*np.random.rand(dim_U) - 1
 G_u_dagger = PDE.solve_at_x(u_dagger, N, x)
-y = G_u_dagger + sigma*np.random.normal(size=num_obs)
+error = sigma*np.random.normal(size=num_obs)
+y = G_u_dagger + error
 #uniform density for |x[i]| < 1
 uniform_density = lambda x: 1*(np.amax(np.abs(x)) <= 1)
 

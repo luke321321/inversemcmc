@@ -16,8 +16,8 @@ where u \in [-1,1]^d and the truth u^* is randomly generated."""
 
 import numpy as np
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 from scipy.stats import lognorm
+import os
 
 from GaussianProcess import GaussianProcess as gp
 import PDE_CGSSZ as PDE
@@ -30,20 +30,24 @@ def MCMC_helper(density_post, name, shot_name):
 def save_data(run, shot_name):
     mean = np.sum(run, 0)/length
     sol_at_mean = PDE.solve_at_x(mean, N, x)
-    np.savez_compressed('output_CGSSZ_' + short_name, run=run, k_dagger=k_dagger,
+    np.savez_compressed('output\CGSSZ_' + short_name, run=run, k_dagger=k_dagger,
                         G_k_dagger=G_k_dagger, y=y, sol_at_mean=sol_at_mean, dim_k=dim_k,
                         length=length, sigma=sigma, burn_time=burn_time,
                         speed_random_walk=speed_random_walk, num_obs=num_obs, N=N,
                         num_design_points=num_design_points)
     
+#Make output directory
+os.makedirs('output', exist_ok=True)
+    
 #%% Setup variables and functions
-sigma = np.sqrt(10 ** -1) #size of the noise in observations
+np.random.seed(97)
+sigma = np.sqrt(10 ** -3) #size of the noise in observations
 dim_k = 3
 length = 10 ** 5 #length of MCMC
 burn_time = 3000
 num_design_points = 20 #in each dimension
-speed_random_walk = 0.2
-num_obs = 10
+speed_random_walk = 0.1
+num_obs = 9
 #num_obs evenly spaced points in (0,1)
 x = np.arange(1, num_obs + 1)/(num_obs + 1)
 #N: number basis functions for solving PDE
@@ -54,14 +58,17 @@ N = 2 ** 10
 k_dagger = np.random.lognormal(size=dim_k)
 #sol u for k_dagger at points x
 G_k_dagger = PDE.solve_at_x(k_dagger, N, x)
-y = G_k_dagger + sigma*np.random.normal(size=num_obs)
+error = sigma*np.random.normal(size=num_obs)
+y = G_k_dagger + error
 
 phi = lambda k: np.sum((y - PDE.solve_at_x(k, N, x)) ** 2)/(2*(sigma**2))
 vphi = np.vectorize(phi, signature='(i)->()')
 
 #Have the design_points so they are log normally distributed ie do inverse of cdf
 #can't have all 0's being a design point otherwise PDE isn't solvable
-design_points = gp.create_uniform_grid(1e-14, 1-1/num_design_points, num_design_points, dim_k)
+max_design_point = max(1-1/num_design_points, 0.999)
+min_design_point = min(1/num_design_points, 1e-5)
+design_points = gp.create_uniform_grid(min_design_point, max_design_point, num_design_points, dim_k)
 design_points = lognorm.ppf(design_points, 1)
 
 #Create Gaussian Process with exp kernel
