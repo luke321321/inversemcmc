@@ -46,7 +46,8 @@ def MH_random_walk(density, length, speed=0.5, x0=np.array([0]), burn_time=1000)
                 x[i] = x[i-1]
     return accepted_count, x[burn_time:]
 
-def runMCMC(dens, length, speed_random_walk, x0, x, N, name, PDE, sol_true, sol_obs, burn=1000):
+def runMCMC(dens, length, speed_random_walk, x0, x, N, name, short_name,
+            PDE, sol_true, sol_obs, burn=1000):
     """Helper function to start off running MCMC"""
     print('\n' + name)
     print('Running MCMC with length:', length, 'and speed:', speed_random_walk)
@@ -61,11 +62,11 @@ def runMCMC(dens, length, speed_random_walk, x0, x, N, name, PDE, sol_true, sol_
     
     print('Average error from true values is:', np.sqrt(np.sum((sol_at_mean - sol_true)**2))/len(x))
     print('Average error from observed values is:', np.sqrt(np.sum((sol_at_mean - sol_obs)**2))/len(x))
-    plot_dist(run, name)
-    np.save("MCMC_run.npy", run)
+    plot_dist(run, name, short_name)
+    np.save('output_run_' + short_name, run)
     return run
 
-def plot_dist(dist, title):
+def plot_dist(dist, title, short_name):
     """Plots the distribution on a grid"""
     sns.set(color_codes=True)
     sns.set_style('ticks')
@@ -74,4 +75,4 @@ def plot_dist(dist, title):
     g.map_lower(sns.kdeplot, cmap="Blues_d", n_levels=5)
     for i, j in zip(*np.triu_indices_from(g.axes, 1)):
         g.axes[i, j].set_visible(False)
-    g.savefig("output.png")
+    g.savefig('output_' + short_name + '.png')

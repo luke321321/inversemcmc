@@ -19,29 +19,38 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from scipy.stats import lognorm
 
-#import timeit
-#import cProfile
-#import pstats
-
 from GaussianProcess import GaussianProcess as gp
 import PDE_CGSSZ as PDE
 from MCMC import runMCMC
 
+def MCMC_helper(density_post, name, shot_name):
+    return runMCMC(density_post, length, speed_random_walk, x0, x, N, name, short_name,
+                   PDE, G_k_dagger, y, burn=burn_time)
+
+def save_data(run, shot_name):
+    mean = np.sum(run, 0)/length
+    sol_at_mean = PDE.solve_at_x(mean, N, x)
+    np.savez_compressed('output_CGSSZ_' + short_name, run=run, k_dagger=k_dagger,
+                        G_k_dagger=G_k_dagger, y=y, sol_at_mean=sol_at_mean, dim_k=dim_k,
+                        length=length, sigma=sigma, burn_time=burn_time,
+                        speed_random_walk=speed_random_walk, num_obs=num_obs, N=N,
+                        num_design_points=num_design_points)
+    
 #%% Setup variables and functions
-sigma = np.sqrt(10 ** -2) #size of the noise in observations
+sigma = np.sqrt(10 ** -1) #size of the noise in observations
 dim_k = 3
-length = int(10 ** 4) #length of MCMC
+length = 10 ** 5 #length of MCMC
 burn_time = 3000
 num_design_points = 20 #in each dimension
-speed_random_walk = 10 ** -1
+speed_random_walk = 0.2
 num_obs = 10
 #num_obs evenly spaced points in (0,1)
 x = np.arange(1, num_obs + 1)/(num_obs + 1)
 #N: number basis functions for solving PDE
-N = 2 ** 7
+N = 2 ** 10
 
 #Generate data
-#The truth u_dagger
+#The truth k_dagger
 k_dagger = np.random.lognormal(size=dim_k)
 #sol u for k_dagger at points x
 G_k_dagger = PDE.solve_at_x(k_dagger, N, x)
@@ -59,10 +68,8 @@ design_points = lognorm.ppf(design_points, 1)
 GP = gp(design_points, vphi(design_points))
 
 #%% Calculations
-density_prior = lambda u: lognorm.pdf(np.sum(u), 1)
-
-def MCMC_helper(density_post, name):
-    return runMCMC(density_post, length, speed_random_walk, x0, x, N, name, PDE, G_k_dagger, y, burn=burn_time)
+#Note scipy lognormal pdf doesn't seem to check if u > 0 so do this myself
+density_prior = lambda u: lognorm.pdf(np.sqrt(np.sum(u**2)), 1)*(np.all(u > 0))
 
 flag_run_MCMC = 1
 if flag_run_MCMC:
@@ -75,17 +82,23 @@ if flag_run_MCMC:
     if 0:
         density_post = lambda u: np.exp(-phi(u))*density_prior(u)
         name = 'True posterior'
-        run_true = MCMC_helper(density_post, name)
+        short_name = 'true'
+        run_true = MCMC_helper(density_post, name, short_name)
+        save_data(run_true, short_name)
     
     if 0:
         density_post = lambda u: np.exp(-GP.mean(u))*density_prior(u)
         name = 'GP as mean - ie marginal approximation'
-        run_mean = MCMC_helper(density_post, name)
+        short_name = 'mean'
+        run_mean = MCMC_helper(density_post, name, short_name)
+        save_data(run_mean, short_name)
         
     if 1:
         density_post = lambda u: np.exp(-GP.GP_eval(u))*density_prior(u)
         name = 'GP - one evaluation'
-        run_GP = MCMC_helper(density_post, name)
+        short_name = 'GP'
+        run_GP = MCMC_helper(density_post, name, short_name)
+        save_data(run_GP, short_name)
     
     if 0:
         #Grid points to interpolate with
@@ -93,4 +106,6 @@ if flag_run_MCMC:
         interp = GP.GP(num_interp_points)
         density_post = lambda u: np.exp(-interp(u))*density_prior(u)
         name = 'pi^N_rand via interpolation'
-        run_rand = MCMC_helper(density_post, name)
+        short_name = 'interp'
+        run_rand = MCMC_helper(density_post, name, short_name)
+        save_data(run_rand, short_name)

@@ -22,13 +22,22 @@ import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
-#import timeit
-#import cProfile
-#import pstats
-
 from GaussianProcess import GaussianProcess as gp
 import PDE_A as PDE
 from MCMC import runMCMC
+
+def MCMC_helper(density_post, name, short_name):
+    return runMCMC(density_post, length, speed_random_walk, x0, x, N, name, short_name,
+                   PDE, G_u_dagger, y, burn=burn_time)
+
+def save_data(run, short_name):
+    mean = np.sum(run, 0)/length
+    sol_at_mean = PDE.solve_at_x(mean, N, x)
+    np.savez_compressed('output_A_' + short_name, run=run, u_dagger=u_dagger,
+                        G_u_dagger=G_u_dagger, y=y, sol_at_mean=sol_at_mean, dim_U=dim_U,
+                        length=length, sigma=sigma, burn_time=burn_time,
+                        speed_random_walk=speed_random_walk, num_obs=num_obs, N=N,
+                        num_design_points=num_design_points)
 
 #%% Setup variables and functions
 sigma = np.sqrt(10 ** 0) #size of the noise in observations
@@ -66,9 +75,6 @@ GP = gp(design_points, vphi(design_points))
 #u lives in [-1,1] so use uniform dist as prior or could use normal with cutoff |x| < 2 
 density_prior = uniform_density
 
-def MCMC_helper(density_post, name):
-    return runMCMC(density_post, length, speed_random_walk, x0, x, N, name, PDE, G_u_dagger, y, burn=burn_time)
-
 flag_run_MCMC = 1
 if flag_run_MCMC:
     x0 = np.zeros(dim_U)
@@ -81,17 +87,23 @@ if flag_run_MCMC:
     if 0:
         density_post = lambda u: np.exp(-phi(u))*density_prior(u)
         name = 'True posterior'
-        run_true = MCMC_helper(density_post, name)
+        short_name = 'true'
+        run_true = MCMC_helper(density_post, name, short_name)
+        save_data(run_true, short_name)
     
     if 0:
         density_post = lambda u: np.exp(-GP.mean(u))*density_prior(u)
         name = 'GP as mean - ie marginal approximation'
-        run_mean = MCMC_helper(density_post, name)
+        short_name = 'mean'
+        run_mean = MCMC_helper(density_post, name, short_name)
+        save_data(run_mean, short_name)
         
     if 1:
         density_post = lambda u: np.exp(-GP.GP_eval(u))*density_prior(u)
         name = 'GP - one evaluation'
-        run_GP = MCMC_helper(density_post, name)
+        short_name = 'GP'
+        run_GP = MCMC_helper(density_post, name, short_name)
+        save_data(run_GP, short_name)
     
     if 0:
         #Grid points to interpolate with
@@ -99,7 +111,9 @@ if flag_run_MCMC:
         interp = GP.GP(num_interp_points)
         density_post = lambda u: np.exp(-interp(u))*density_prior(u)
         name = 'pi^N_rand via interpolation'
-        run_rand = MCMC_helper(density_post, name)
+        short_name = 'interp'
+        run_rand = MCMC_helper(density_post, name, short_name)
+        save_data(run_rand, short_name)
 
 #%% Debugging section:
 #Plotting phi and GP of phi:
