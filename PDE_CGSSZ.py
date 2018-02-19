@@ -12,9 +12,9 @@ with k_0 = 1
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.sparse import diags
-#from scipy.sparse.linalg import spsolve
+from scipy.sparse.linalg import spsolve
 #Quicker sparse LA solver: install via: 'conda install -c haasad pypardiso'
-from pypardiso import spsolve
+#from pypardiso import spsolve
 
 def solve(k, N):
     """Solves the PDE in (0,1) with coefficients k and
