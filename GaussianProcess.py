@@ -1,6 +1,7 @@
 import numpy as np
 import math
 import numbers
+import matplotlib.pyplot as plt
 from scipy.special import gamma, kv
 from scipy.interpolate import RegularGridInterpolator, interp1d
 
@@ -128,6 +129,20 @@ class GaussianProcess:
         X = self.X[:self.index]
         Y = self.Y[:self.index]
         return X,Y
+    
+    def plot_1d(self):
+        """Plots Gaussian Process (assumes in 1d)"""
+        
+        #Sort to plot nicer
+        X,Y = self.get_data()
+        ind = np.argsort(X.flatten())
+        X = X.flatten()[ind]
+        Y = Y[ind]
+        
+        #Plot results:
+        plt.figure()
+        plt.plot(X, Y)
+        plt.show()
     
     def GP_eval(self, x):
         #first check lengeth of array X and Y and expand if necessary
