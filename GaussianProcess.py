@@ -387,4 +387,5 @@ class GaussianProcess:
                 else:
                     for j in range(v.shape[0]):
                         r2[:,j] = np.sum(np.square(u - v[j][np.newaxis, :]), 1)
+                r2 = np.squeeze(r2)
         return r2
