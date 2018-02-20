@@ -268,9 +268,8 @@ class GaussianProcess:
         """Checks if storage arrays are big enough and resizes if needed"""
         if(self.index == len(self.Y)):
             #double length of arrays
-            if self.dim == 1:
-                self.X = np.concatenate((self.X, np.zeros(len(self.X), dtype=self.X.dtype)))
-            self.Y = np.concatenate((self.Y, np.zeros(len(self.Y), dtype=self.Y.dtype)))
+            self.X = np.concatenate((self.X, np.zeros(self.X.shape, dtype=self.X.dtype)))
+            self.Y = np.concatenate((self.Y, np.zeros(self.Y.shape, dtype=self.Y.dtype)))
     
     def GP_bridge(self, x, points, data):
         """Uses a small Gaussian process to evaluate the GP at x given it at points
