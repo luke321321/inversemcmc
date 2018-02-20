@@ -209,30 +209,51 @@ class GaussianProcess:
         else:
             """Idea: In each 2*d axis direction find nearest point to x and choose it (by its index).
             If no point in that direction then doesn't matter"""
-            dist = self.r2_distance(x, self.X)
+            dist = self.r2_distance(x, X)
             
-            diff = X - x
             #use set structure to easily ensure values are unique
             index = set()
-    
-            for d in range(self.dim):
-                ind_pos = np.nonzero(diff[:, d] > 0)
-                ind_neg = np.nonzero(diff[:, d] < 0)
-                dist_pos = dist[ind_pos]
-                dist_neg = dist[ind_neg]
-                
-                #try/except incase ind_pos is empty
-                try:            
-                    closest_ind = np.argmin(dist_pos)
-                    index.add((ind_pos[0][closest_ind]))
-                except:
-                    pass
-                try:            
-                    closest_ind = np.argmin(dist_neg)
-                    index.add((ind_neg[0][closest_ind]))
-                except:
-                    pass
+            #first add closest 2*d points then check to see if missed any in any axis and add extra if needed
+            #really add 3*d points to try and make sure we don't have to loop through things
+            num_close = min(3*self.dim, self.index)
+            ind_close = np.argpartition(dist, num_close)
+            for i in ind_close[:num_close]:
+                index.add(i)
             
+            diff = None
+            for d in range(self.dim):
+                #check to see if element in index is a candidate for that dim
+                ind_pos = None
+                ind_neg = None
+                for i in index:
+                    tmp = (x-X[i])[:, d]
+                    if tmp > 0:
+                        ind_pos = i
+                    elif tmp < 0:
+                        ind_neg = i
+                #if no suitable candiate found then do it the slow way
+                if ind_pos is None or ind_neg is None:
+                    if diff is None:
+                        diff = x - X
+                    if ind_pos is None:
+                        ind_pos = np.nonzero(diff[:, d] > 0)
+                        dist_pos = dist[ind_pos]
+                        
+                        #try/except incase ind_pos is empty
+                        try:            
+                            closest_ind = np.argmin(dist_pos)
+                            index.add((ind_pos[0][closest_ind]))
+                        except:
+                            pass
+                    if ind_neg is None:
+                        ind_neg = np.nonzero(diff[:, d] < 0)
+                        dist_neg = dist[ind_neg]
+                        try:            
+                            closest_ind = np.argmin(dist_neg)
+                            index.add((ind_neg[0][closest_ind]))
+                        except:
+                            pass
+
             ind = list(index)
             points = X[ind]
         
