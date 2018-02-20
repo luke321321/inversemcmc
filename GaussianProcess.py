@@ -9,7 +9,6 @@ import numbers
 import matplotlib.pyplot as plt
 from scipy.special import gamma, kv
 from scipy.interpolate import RegularGridInterpolator, interp1d
-from scipy.spatial import Delaunay
 
 class GaussianProcess:
     def __init__(self, points, data, total_calls = 1000, nu=1/2, sig2 = 1, lam = 1):
@@ -124,25 +123,21 @@ class GaussianProcess:
 
     def reset(self):
         """Setup empty arrays to store data and coordinates in for GP_eval method"""
-        self.Y = np.concatenate((self.data, 
-                                np.zeros(self.total_calls - self.data_length, dtype=self.data.dtype)))
         if self.dim == 1:
             self.X = np.concatenate((self.points[:,0], 
                                 np.zeros(self.total_calls - self.data_length, dtype=self.points.dtype)))
         else:
-            #TODO change arguments depending on dimension like scipy docs?
-            self.tri = Delaunay(self.points, incremental=True)
-            
+            self.X = np.concatenate((self.points, 
+                                     np.zeros((self.total_calls - self.data_length, self.dim), dtype=self.points.dtype)))
+        self.Y = np.concatenate((self.data, 
+                                np.zeros(self.total_calls - self.data_length, dtype=self.data.dtype)))
         self.index = self.data_length
         
     def get_data(self):
         """Returns the non-zero data and points"""
+        X = self.X[:self.index]
         Y = self.Y[:self.index]
-        if self.dim == 1:
-            X = self.X[:self.index]
-        else:
-            X = self.tri.points
-            
+
         return X, Y
     
     def plot_1d(self):
@@ -167,16 +162,27 @@ class GaussianProcess:
         if len(x.shape) == 1:
             x = x.reshape(1, self.dim)
         
+        """First find closest 2*d points to x
+        Code is good in 1d but bad in n dim
+        Ideally create RTree but first do naive thing.
+        Runs in O(n) time instead of O(log(n)) for RTree insertion and nearest neighbour
+        Really only need smallest convex hull in self.X that contains x"""
+        
         ind, points = self.find_closest(x)
-#        points = points
         data = self.Y[ind]
         
-        
         #check to see if close enough already
-        if np.any(self.r2_distance(x, points) < self.tol):
-            pass #don't cal new point
-            #TODO add in this
-        data_new = self.GP_bridge(x, points, data)
+        dist = self.r2_distance(x, points)
+        ind_min_dist = np.argmin(dist)
+        if len(ind) == 1:
+            if dist < self.tol:
+                data_new = self.Y[ind]
+            else:
+                data_new = self.GP_bridge(x, points, data)
+        elif dist[ind_min_dist] < self.tol:
+            data_new = self.Y[ind_min_dist]
+        else:
+            data_new = self.GP_bridge(x, points, data)
         
         self.add_data(ind, x, data_new)
 
@@ -187,8 +193,8 @@ class GaussianProcess:
         Returns: ind, points
         index an array of lists and the closest points 
         """
+        X = self.X[:self.index]
         if self.dim == 1:
-            X = self.X[:self.index]
             ind = np.searchsorted(X, x, side='left')
             ind = np.squeeze(ind).tolist()
             if ind != 0 and ind != self.index:
@@ -201,11 +207,34 @@ class GaussianProcess:
             points = X[ind]
             points = points[:, np.newaxis]
         else:
-            #TODO deal with out of triangulation points
-            #Just add to the tri and then find 2 other points close to it.
-            ind_simplex = self.tri.find_simplex(x)
-            ind = np.squeeze(self.tri.simplices[ind_simplex])
-            points = np.squeeze(self.tri.points[ind])
+            """Idea: In each 2*d axis direction find nearest point to x and choose it (by its index).
+            If no point in that direction then doesn't matter"""
+            dist = self.r2_distance(x, self.X)
+            
+            diff = X - x
+            #use set structure to easily ensure values are unique
+            index = set()
+    
+            for d in range(self.dim):
+                ind_pos = np.nonzero(diff[:, d] > 0)
+                ind_neg = np.nonzero(diff[:, d] < 0)
+                dist_pos = dist[ind_pos]
+                dist_neg = dist[ind_neg]
+                
+                #try/except incase ind_pos is empty
+                try:            
+                    closest_ind = np.argmin(dist_pos)
+                    index.add((ind_pos[0][closest_ind]))
+                except:
+                    pass
+                try:            
+                    closest_ind = np.argmin(dist_neg)
+                    index.add((ind_neg[0][closest_ind]))
+                except:
+                    pass
+            
+            ind = list(index)
+            points = X[ind]
         
         return ind, points
     
@@ -230,12 +259,7 @@ class GaussianProcess:
                 self.X[ind_L] = x
                 self.Y[ind_L] = data
         else:
-            #TODO do we get better performance if we rebuild triangulation every so often?
-            if self.index % 10000 != 1:
-                self.tri.add_points(x)
-            else:
-                #TODO does this screw up counting for Y?
-                self.tri.add_points(x.T, restart=True)
+            self.X[self.index] = x
             self.Y[self.index] = data
             
         self.index += 1

@@ -289,5 +289,5 @@ if __name__ == '__main__':
 #    np.random.seed(100)
 #    test_GP_interp_2d()
     
-    test_find_and_add_1d()
-#    test_find_and_add_2d()
+#    test_find_and_add_1d()
+    test_find_and_add_2d()
