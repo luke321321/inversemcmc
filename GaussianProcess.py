@@ -237,23 +237,16 @@ class GaussianProcess:
                         diff = x - X
                     if ind_pos is None:
                         ind_pos = np.nonzero(diff[:, d] > 0)
-                        dist_pos = dist[ind_pos]
-                        
-                        #try/except incase ind_pos is empty
-                        try:            
+                        if ind_pos[0].size > 0:
+                            dist_pos = dist[ind_pos]         
                             closest_ind = np.argmin(dist_pos)
                             index.add((ind_pos[0][closest_ind]))
-                        except:
-                            pass
                     if ind_neg is None:
                         ind_neg = np.nonzero(diff[:, d] < 0)
-                        dist_neg = dist[ind_neg]
-                        try:            
+                        if ind_neg[0].size > 0:
+                            dist_neg = dist[ind_neg]          
                             closest_ind = np.argmin(dist_neg)
                             index.add((ind_neg[0][closest_ind]))
-                        except:
-                            pass
-
             ind = list(index)
             points = X[ind]
         
