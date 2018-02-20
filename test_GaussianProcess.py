@@ -243,14 +243,22 @@ def test_find_and_add_1d():
     X = np.arange(10)/10
     GP = GaussianProcess(X, np.ones(X.shape))
     
+    #add some 'bad' data
+    GP.GP_eval(np.array([-0.1]))
+    GP.GP_eval(np.array([1]))
     #add some random data
-    for _ in range(10):
+    for _ in range(15):
         GP.GP_eval(np.random.uniform(size=(1)))
         
-    x = np.random.uniform(size=(1))
+    x = 1.2*np.random.uniform(size=(1))
     ind, points = GP.find_closest(x)
     
+    points = np.squeeze(points, axis=1)
     X, _ = GP.get_data()
+    
+    #make sure data is sorted
+    assert np.all(X[:-1] <= X[1:])
+    
     plt.figure()
     plt.hlines(1,0,1)
     plt.eventplot(X, orientation='horizontal', colors='b', linestyles='dotted')
@@ -281,5 +289,5 @@ if __name__ == '__main__':
 #    np.random.seed(100)
 #    test_GP_interp_2d()
     
-#    test_find_and_add_1d()
-    test_find_and_add_2d()
+    test_find_and_add_1d()
+#    test_find_and_add_2d()

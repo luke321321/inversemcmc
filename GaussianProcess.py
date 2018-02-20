@@ -59,6 +59,8 @@ class GaussianProcess:
             data = self.data
         if points is None:
             points = self.points
+            
+        #check points are shaped correctly
         
         if len(points) != 1:
             kernel_star_inverse = np.linalg.inv(self.k(points, points))
@@ -128,6 +130,7 @@ class GaussianProcess:
             self.X = np.concatenate((self.points[:,0], 
                                 np.zeros(self.total_calls - self.data_length, dtype=self.points.dtype)))
         else:
+            #TODO change arguments depending on dimension like scipy docs?
             self.tri = Delaunay(self.points, incremental=True)
             
         self.index = self.data_length
@@ -160,8 +163,12 @@ class GaussianProcess:
         #first check lengeth of array X and Y and expand if necessary
         self.check_mem()
         
+        #make sure shape of x is (1, dim)
+        if len(x.shape) == 1:
+            x = x.reshape(1, self.dim)
+        
         ind, points = self.find_closest(x)
-        points = points
+#        points = points
         data = self.Y[ind]
         
         
@@ -183,10 +190,16 @@ class GaussianProcess:
         if self.dim == 1:
             X = self.X[:self.index]
             ind = np.searchsorted(X, x, side='left')
+            ind = np.squeeze(ind).tolist()
             if ind != 0 and ind != self.index:
                 #if not 0 or N
-                ind = [ind[0]-1, ind[0]]
-            points = self.X[ind]               
+                ind = [ind-1, ind]
+            elif ind == 0:
+                ind = [ind]
+            else:
+                ind = [ind-1]
+            points = X[ind]
+            points = points[:, np.newaxis]
         else:
             #TODO deal with out of triangulation points
             #Just add to the tri and then find 2 other points close to it.
@@ -202,13 +215,20 @@ class GaussianProcess:
         if self.dim == 1:
             #make sure index is leftmost
             if len(ind) == 2:
-                ind = ind[1]
-            ind = int(ind)
-            #shift current elements by 1
-            self.X[ind+1:self.index+1] = self.X[ind:self.index]
-            self.Y[ind+1:self.index+1] = self.Y[ind:self.index]
-            self.X[ind] = x
-            self.Y[ind] = data
+                ind_L = ind[1]
+            else:
+                ind_L = ind[0]
+            
+            if len(ind) == 1 and ind[0]+1 == self.index:
+                 #if we're at the last element just insert
+                 self.X[self.index] = x
+                 self.Y[self.index] = data
+            else:
+                #shift current elements by 1
+                self.X[ind_L+1:self.index+1] = self.X[ind_L:self.index]
+                self.Y[ind_L+1:self.index+1] = self.Y[ind_L:self.index]
+                self.X[ind_L] = x
+                self.Y[ind_L] = data
         else:
             #TODO do we get better performance if we rebuild triangulation every so often?
             if self.index % 10000 != 1:
@@ -235,15 +255,17 @@ class GaussianProcess:
         Points: np array (x0, x1, ...)
         Data: np array (f(x0), f(x1), ...)"""
         
-        if len(x.shape) == 1:
-            points = points[:, np.newaxis]
+#        if len(x.shape) == 1:
+#            x = x[np.newaxis, :]
         
         mean, ker = self.create_matern(data = data, points = points)
 
         if len(x.shape) == 1:
             x = x.reshape(1, self.dim)
         all_pts = np.concatenate((x, points))
-        val = np.random.multivariate_normal(mean(all_pts), ker(all_pts, all_pts), check_valid='ignore')
+        m = np.squeeze(mean(all_pts))
+        k = ker(all_pts, all_pts)
+        val = np.random.multivariate_normal(m, k, check_valid='ignore')
         return val[0]
 
 
