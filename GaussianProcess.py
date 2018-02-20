@@ -1,3 +1,8 @@
+""" Data storage methods:
+    If dim = 1 then just keep a sorted list of points
+    If dim >= 2 then uses triangulation from qhull to searc and insert"""
+
+
 import numpy as np
 import math
 import numbers
@@ -53,8 +58,8 @@ class GaussianProcess:
             data = self.data
         if points is None:
             points = self.points
-        #make sure the points are shaped correctly - might not be needed
-        points, data = self.reshape_points(points, data)
+            
+        #check points are shaped correctly
         
         if len(points) != 1:
             kernel_star_inverse = np.linalg.inv(self.k(points, points))
@@ -118,8 +123,12 @@ class GaussianProcess:
 
     def reset(self):
         """Setup empty arrays to store data and coordinates in for GP_eval method"""
-        self.X = np.concatenate((self.points, 
-                                np.zeros((self.total_calls - self.data_length, self.dim), dtype=self.points.dtype)))
+        if self.dim == 1:
+            self.X = np.concatenate((self.points[:,0], 
+                                np.zeros(self.total_calls - self.data_length, dtype=self.points.dtype)))
+        else:
+            self.X = np.concatenate((self.points, 
+                                     np.zeros((self.total_calls - self.data_length, self.dim), dtype=self.points.dtype)))
         self.Y = np.concatenate((self.data, 
                                 np.zeros(self.total_calls - self.data_length, dtype=self.data.dtype)))
         self.index = self.data_length
@@ -128,10 +137,11 @@ class GaussianProcess:
         """Returns the non-zero data and points"""
         X = self.X[:self.index]
         Y = self.Y[:self.index]
-        return X,Y
+
+        return X, Y
     
     def plot_1d(self):
-        """Plots Gaussian Process (assumes in 1d)"""
+        """Plots Gaussian Process (in 1d)"""
         
         #Sort to plot nicer
         X,Y = self.get_data()
@@ -148,82 +158,118 @@ class GaussianProcess:
         #first check lengeth of array X and Y and expand if necessary
         self.check_mem()
         
+        #make sure shape of x is (1, dim)
+        if len(x.shape) == 1:
+            x = x.reshape(1, self.dim)
+        
         """First find closest 2*d points to x
+        Code is good in 1d but bad in n dim
         Ideally create RTree but first do naive thing.
-        Runs in O(n) time instead of O(log(n)) for RTree insertion and nearest neighbou
+        Runs in O(n) time instead of O(log(n)) for RTree insertion and nearest neighbour
         Really only need smallest convex hull in self.X that contains x"""
         
-        #only check distance up to computed values of X - about 1/2 of X is 0s
-        dist = self.r2_distance(x, self.X[:self.index])           
-        
-        #if already computed this value before:
-        ind_min_dist = np.argmin(dist)
-        if dist[ind_min_dist] < self.tol:
-            return self.Y[ind_min_dist]
-        
-        #indices of closest points to x in each dimension (up to 2*d points)
-        ind = self.find_closest(x, self.X[:self.index], dist)
-               
-        points = self.X[ind]
+        ind, points = self.find_closest(x)
         data = self.Y[ind]
-        data_new = self.GP_bridge(x, points, data)
         
-        #add new data to class
-        self.X[self.index] = x
-        self.Y[self.index] = data_new
-        self.index += 1
+        #check to see if close enough already
+        dist = self.r2_distance(x, points)
+        ind_min_dist = np.argmin(dist)
+        if len(ind) == 1:
+            if dist < self.tol:
+                data_new = self.Y[ind]
+            else:
+                data_new = self.GP_bridge(x, points, data)
+        elif dist[ind_min_dist] < self.tol:
+            data_new = self.Y[ind_min_dist]
+        else:
+            data_new = self.GP_bridge(x, points, data)
+        
+        self.add_data(ind, x, data_new)
 
         return data_new
     
-    @staticmethod
-    def find_closest(x, X, dist=None):
-        """Finds a closest points of X to x in each signed direction
-        Returns: index an array of lists st closest points are X[index] 
-        
-        This is a bottleneck and have just done the naive thing here"""
-        
-        #if dim = 1 reshape to reuse code
-        if len(X.shape) == 1:
-            X = X[:, np.newaxis]
-            x = x[:, np.newaxis]
-        dim = X.shape[1]
-        
-        if dist is None:
-            dist = GaussianProcess.r2_distance(x, X)
-                   
-        """Idea: In each 2*d axis direction find nearest point to x and choose it (by its index).
-        If no point in that direction then doesn't matter"""
-        
-        diff = X - x
-        #use set structure to easily ensure values are unique
-        index = set()
-
-        for d in range(dim):
-            ind_pos = np.nonzero(diff[:, d] > 0)
-            ind_neg = np.nonzero(diff[:, d] < 0)
-            dist_pos = dist[ind_pos]
-            dist_neg = dist[ind_neg]
+    def find_closest(self, x):
+        """Finds a closest points to x in each signed direction
+        Returns: ind, points
+        index an array of lists and the closest points 
+        """
+        X = self.X[:self.index]
+        if self.dim == 1:
+            ind = np.searchsorted(X, x, side='left')
+            ind = np.squeeze(ind).tolist()
+            if ind != 0 and ind != self.index:
+                #if not 0 or N
+                ind = [ind-1, ind]
+            elif ind == 0:
+                ind = [ind]
+            else:
+                ind = [ind-1]
+            points = X[ind]
+            points = points[:, np.newaxis]
+        else:
+            """Idea: In each 2*d axis direction find nearest point to x and choose it (by its index).
+            If no point in that direction then doesn't matter"""
+            dist = self.r2_distance(x, self.X)
             
-            #try/except incase ind_pos is empty
-            try:            
-                closest_ind = np.argmin(dist_pos)
-                index.add((ind_pos[0][closest_ind]))
-            except:
-                pass
-            try:            
-                closest_ind = np.argmin(dist_neg)
-                index.add((ind_neg[0][closest_ind]))
-            except:
-                pass
-        
-        #returns the indices as a array of lists
-        return np.array(list(index))
+            diff = X - x
+            #use set structure to easily ensure values are unique
+            index = set()
+    
+            for d in range(self.dim):
+                ind_pos = np.nonzero(diff[:, d] > 0)
+                ind_neg = np.nonzero(diff[:, d] < 0)
+                dist_pos = dist[ind_pos]
+                dist_neg = dist[ind_neg]
+                
+                #try/except incase ind_pos is empty
+                try:            
+                    closest_ind = np.argmin(dist_pos)
+                    index.add((ind_pos[0][closest_ind]))
+                except:
+                    pass
+                try:            
+                    closest_ind = np.argmin(dist_neg)
+                    index.add((ind_neg[0][closest_ind]))
+                except:
+                    pass
             
+            ind = list(index)
+            points = X[ind]
+        
+        return ind, points
+    
+    def add_data(self, ind, x, data):
+        """Adds new point x and corresponding data to the appropriate memory structure"""
+        #add new data to class
+        if self.dim == 1:
+            #make sure index is leftmost
+            if len(ind) == 2:
+                ind_L = ind[1]
+            else:
+                ind_L = ind[0]
+            
+            if len(ind) == 1 and ind[0]+1 == self.index:
+                 #if we're at the last element just insert
+                 self.X[self.index] = x
+                 self.Y[self.index] = data
+            else:
+                #shift current elements by 1
+                self.X[ind_L+1:self.index+1] = self.X[ind_L:self.index]
+                self.Y[ind_L+1:self.index+1] = self.Y[ind_L:self.index]
+                self.X[ind_L] = x
+                self.Y[ind_L] = data
+        else:
+            self.X[self.index] = x
+            self.Y[self.index] = data
+            
+        self.index += 1
+    
     def check_mem(self):
         """Checks if storage arrays are big enough and resizes if needed"""
-        if(self.index == len(self.X)):
+        if(self.index == len(self.Y)):
             #double length of arrays
-            self.X = np.concatenate((self.X, np.zeros((len(self.X), self.dim), dtype=self.X.dtype)))
+            if self.dim == 1:
+                self.X = np.concatenate((self.X, np.zeros(len(self.X), dtype=self.X.dtype)))
             self.Y = np.concatenate((self.Y, np.zeros(len(self.Y), dtype=self.Y.dtype)))
     
     def GP_bridge(self, x, points, data):
@@ -233,12 +279,17 @@ class GaussianProcess:
         Points: np array (x0, x1, ...)
         Data: np array (f(x0), f(x1), ...)"""
         
+#        if len(x.shape) == 1:
+#            x = x[np.newaxis, :]
+        
         mean, ker = self.create_matern(data = data, points = points)
 
         if len(x.shape) == 1:
             x = x.reshape(1, self.dim)
         all_pts = np.concatenate((x, points))
-        val = np.random.multivariate_normal(mean(all_pts), ker(all_pts, all_pts), check_valid='ignore')
+        m = np.squeeze(mean(all_pts))
+        k = ker(all_pts, all_pts)
+        val = np.random.multivariate_normal(m, k, check_valid='ignore')
         return val[0]
 
 

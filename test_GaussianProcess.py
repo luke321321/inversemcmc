@@ -218,30 +218,52 @@ def test_GP_GP_bridge_2d():
     plt.title('test_GP_GP_bridge_2d')
     plt.show()
     
-def test_find_closest_2d():
+def test_find_and_add_2d():
     """Green are closen points, red is x, blue dotted are X (not chosen)"""
     X = np.random.uniform(size=(20,2))
+    GP = GaussianProcess(X, np.ones(X.shape[0]))
+    
+    #add some random data
+    for _ in range(10):
+        GP.GP_eval(np.random.uniform(size=(1,2)))
+    
     x = np.random.uniform(size=(1,2))
+    ind, points = GP.find_closest(x)
     
     plt.figure()
     plt.plot(X[:,0], X[:,1],'bo')
     plt.plot(x[:,0], x[:,1],'ro')
-    hull = X[GaussianProcess.find_closest(x,X)]
-    plt.plot(hull[:,0], hull[:,1], 'go')
+
+    plt.plot(points[:,0], points[:,1], 'go')
     plt.title('test_find_closest_2d')
     plt.show()
     
-def test_find_closest_1d():
+def test_find_and_add_1d():
     """Green are closen points, red is x, blue dotted are X (not chosen)"""
-    X = np.random.uniform(size=(20))
-    x = np.random.uniform(size=(1))
-    hull = X[GaussianProcess.find_closest(x,X)]
+    X = np.arange(10)/10
+    GP = GaussianProcess(X, np.ones(X.shape))
+    
+    #add some 'bad' data
+    GP.GP_eval(np.array([-0.1]))
+    GP.GP_eval(np.array([1]))
+    #add some random data
+    for _ in range(15):
+        GP.GP_eval(np.random.uniform(size=(1)))
+        
+    x = 1.2*np.random.uniform(size=(1))
+    ind, points = GP.find_closest(x)
+    
+    points = np.squeeze(points, axis=1)
+    X, _ = GP.get_data()
+    
+    #make sure data is sorted
+    assert np.all(X[:-1] <= X[1:])
     
     plt.figure()
     plt.hlines(1,0,1)
     plt.eventplot(X, orientation='horizontal', colors='b', linestyles='dotted')
     plt.eventplot(x, orientation='horizontal', colors='r')
-    plt.eventplot(hull, orientation='horizontal', colors='g', linestyles='dashed')
+    plt.eventplot(points, orientation='horizontal', colors='g', linestyles='dashed')
     plt.axis('off')
     
     plt.title('test_find_closest_1d')
@@ -256,7 +278,7 @@ if __name__ == '__main__':
 #    np.random.seed(100)  
 #    test_GP_samples_1d()
 #    np.random.seed(100)
-    test_GP_GP_bridge_1d()
+#    test_GP_GP_bridge_1d()
 #    np.random.seed(100)
 #    test_GP_interp_1d()
     
@@ -267,5 +289,5 @@ if __name__ == '__main__':
 #    np.random.seed(100)
 #    test_GP_interp_2d()
     
-#    test_find_closest_1d()
-#    test_find_closest_2d()
+#    test_find_and_add_1d()
+    test_find_and_add_2d()
