@@ -183,8 +183,7 @@ class GaussianProcess:
             data_new = self.Y[ind_min_dist]
         else:
             data_new = self.GP_bridge(x, points, data)
-        
-        self.add_data(ind, x, data_new)
+            self.add_data(ind, x, data_new)
 
         return data_new
     
