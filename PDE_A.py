@@ -103,7 +103,6 @@ def solve_at_x(u, N, x):
 #plt.figure()
 #plt.plot(nodes,p)
 #plt.show()
-#print('Value at 0.5:', solve_at_x(u,N,0.5))
 #cProfile.runctx('solve_at_x(u,N,x)'
 #                , globals(), locals(), '.prof')
 #s = pstats.Stats('.prof')

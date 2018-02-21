@@ -21,7 +21,13 @@ def solve(k, N):
     N number of Chebyshev interpolant points"""
     
     #Make sure k_0 = 1 (or however many dimesions we are not searching for)
-    k_full = np.concatenate((np.ones(10-k.shape[0]), k))
+    #have k in the middle of vector of ones (total length = 10)
+    dim_k = k.shape[0]
+    if dim_k % 2 != 1:
+        pad_width = (int((11-dim_k)/2), int((9-dim_k)/2))
+    else:
+        pad_width = int((10-dim_k)/2)
+    k_full = np.pad(k, pad_width, 'constant', constant_values=1)
     
     #Boundary condition, p(1; u) = c
     c = 1.
@@ -94,13 +100,12 @@ def solve_at_x(k, N, x):
     return (p[i-1]*(x - nodes[i-1])+ p[i]*(nodes[i] - x))/(nodes[i] - nodes[i-1])
 
 #%%Testing code for PDE solver
-#k = np.random.lognormal(size=4)
+#k = np.random.lognormal(size=3)
 #N = 10000
 #u, nodes = solve(k, N)
 #plt.figure()
 #plt.plot(nodes, u)
 #plt.show()
-#print('Value at 0.5:', solve_at_x(k, N, 0.5))
 #cProfile.runctx('solve_at_x(u,N,0.25)'
 #                , globals(), locals(), '.prof')
 #s = pstats.Stats('.prof')

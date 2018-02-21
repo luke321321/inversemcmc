@@ -28,13 +28,13 @@ import PDE_A as PDE
 from MCMC import runMCMC
 
 def MCMC_helper(density_post, name, short_name):
-    return runMCMC(density_post, length, speed_random_walk, x0, x, N, name, short_name,
+    return runMCMC(density_post, length, speed_random_walk, x0, x, N, name, 'A_' + short_name,
                    PDE, G_u_dagger, y, burn=burn_time)
 
 def save_data(run, short_name):
     mean = np.sum(run, 0)/length
     sol_at_mean = PDE.solve_at_x(mean, N, x)
-    np.savez_compressed('output/A_' + short_name, run=run, u_dagger=u_dagger,
+    np.savez_compressed(os.path.join('output', 'A_' + short_name), run=run, u_dagger=u_dagger,
                         G_u_dagger=G_u_dagger, y=y, sol_at_mean=sol_at_mean, dim_U=dim_U,
                         length=length, sigma=sigma, burn_time=burn_time,
                         speed_random_walk=speed_random_walk, num_obs=num_obs, N=N,
@@ -44,7 +44,8 @@ def save_data(run, short_name):
 os.makedirs('output', exist_ok=True)
 
 #%% Setup variables and functions
-sigma = np.sqrt(10 ** -1) #size of the noise in observations
+np.random.seed(97)
+sigma = np.sqrt(10 ** -2) #size of the noise in observations
 dim_U = 3
 length = 10 ** 5 #length of MCMC
 burn_time = 1000
@@ -53,12 +54,12 @@ speed_random_walk = 0.1
 #End points of n-dim lattice for the design points
 min_range = -1
 max_range = 1
-num_obs = 15
+num_obs = 20
 #num_obs evenly spaced points in (0,1)
 x = np.arange(1, num_obs+1)/(num_obs + 1)
 
 #N: number basis functions for solving PDE
-N = 2 ** 10
+N = 2 ** 7
 
 #Generate data
 #The truth u_dagger lives in [-1,1]
@@ -96,14 +97,14 @@ if flag_run_MCMC:
         run_true = MCMC_helper(density_post, name, short_name)
         save_data(run_true, short_name)
     
-    if 0:
+    if 1:
         density_post = lambda u: np.exp(-GP.mean(u))*density_prior(u)
         name = 'GP as mean - ie marginal approximation'
         short_name = 'mean'
         run_mean = MCMC_helper(density_post, name, short_name)
         save_data(run_mean, short_name)
         
-    if 1:
+    if 0:
         density_post = lambda u: np.exp(-GP.GP_eval(u))*density_prior(u)
         name = 'GP - one evaluation'
         short_name = 'GP'
@@ -112,9 +113,17 @@ if flag_run_MCMC:
     
     if 0:
         #Grid points to interpolate with
-        num_interp_points = 4 * num_design_points
-        interp = GP.GP(num_interp_points)
-        density_post = lambda u: np.exp(-interp(u))*density_prior(u)
+        num_interp_points = int(2.5 * num_design_points)
+        interp = GP.GP_interp(num_interp_points)
+        
+        #longer def since can't use the interplator out of range
+        def density_post(u):
+            tmp = density_prior(u)
+            if tmp != 0:
+                return np.exp(-interp(u))*tmp
+            else:
+                return 0
+        
         name = 'pi^N_rand via interpolation'
         short_name = 'interp'
         run_rand = MCMC_helper(density_post, name, short_name)
