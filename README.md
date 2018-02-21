@@ -9,8 +9,8 @@ The second example is using applying a Gaussian Process Approximator to the prob
 Here they have instead used a randomised PDE solver using random basis function for their FEM.
 We randomise differently using a Gaussian process approximator.
 
-Note because the code currently has a naive way of searching spatial data it runs in `O(d*n^2)`, where `n` is length of MCMC and `d` is the dimension of the parameter space.
-Using an R* Tree (or another data structure) should reduce this down to `O(d*n*log(n))`.
+Note because the code currently has a naive way of searching spatial data it runs in `O(n^3)`, where `n` is length of MCMC run.
+Using an R* Tree (or another data structure) should reduce this down to `O(n*log(n))`.
 
 ### How do I get set up? ###
 
