@@ -117,7 +117,7 @@ class GaussianProcess:
         else:
             #reshape grid and data to fit the interpolator method
             grid_points_grid = [np.linspace(dp_min, dp_max, num_grid_points) for _ in range(self.dim)]
-            GP_eval = self.GP_at_points(grid).reshape(num_grid_points, num_grid_points)
+            GP_eval = self.GP_at_points(grid).reshape([num_grid_points for _ in range(self.dim)])
             return RegularGridInterpolator(grid_points_grid, GP_eval)
         
 
