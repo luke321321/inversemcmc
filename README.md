@@ -5,7 +5,7 @@ We look at two different examples.
 
 The first example, `MCMC_A.py` is from section 5 of this [paper](http://dx.doi.org/10.1090/mcom/3244) (also available on [arXiv](https://arxiv.org/abs/1603.02004)).
 
-The second example is using applying a Gaussian Process Approximator to the problem from section 5 of this [paper](https://doi.org/10.1007/s11222-016-9671-0).
+The second example, `MCMC_CGSSZ.py` is using applying a Gaussian Process Approximator to the problem from section 5 of this [paper](https://doi.org/10.1007/s11222-016-9671-0).
 Here they have instead used a randomised PDE solver using random basis function for their FEM.
 We randomise differently using a Gaussian process approximator.
 
@@ -22,18 +22,10 @@ Optional dependencies:
 
 	hypothesis and tqdm
 
-If you don't have the optional dependencies installed then the code can be simply modified as follows.
+If you don't have the optional dependencies installed then `MCMC_A.py` and `MCMC_CGSSZ.py` will run fine but there won't be a progress bar.
 
-`tqdm` is only used to give a progress bar for the MCMC run contained in `MCMC.py`.
-To remove this dependency just replace the line (currently `line 31`) in `MCMC.py`
+`tqdm` is used to give a progress bar for the MCMC run contained in `MCMC.py` but the code will adapt if the `tqdm` is not installed.
 
-```python
-	for i in tqdm(range(1,burn_time + length)):
-```
-by
-```python
-	for i in range(1,burn_time + length):
-```
 `hypothesis` is only required for running the test code (`test_GaussianProcess.py`).
 	
 

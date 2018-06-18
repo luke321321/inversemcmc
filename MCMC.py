@@ -6,11 +6,18 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import random
-import matplotlib.pyplot as plt
 import os
 
-#Progress bar
-from tqdm import tqdm
+#Progress bar if tqdm module is installed
+import importlib
+tqdm_spec = importlib.util.find_spec("tqdm")
+found_tqdm = tqdm_spec is not None
+
+if found_tqdm:
+    from tqdm import tqdm
+else:
+    def tqdm(arg):
+        return arg
 
 #We pass dimension via x0
 def MH_random_walk(density, length, speed=0.5, x0=np.array([0]), burn_time=1000):
