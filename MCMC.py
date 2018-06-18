@@ -80,7 +80,7 @@ def plot_dist(dist, title, short_name):
     sns.set_style('ticks')
     g = sns.PairGrid(pd.DataFrame(dist), despine=True)
     g.map_diag(sns.kdeplot, legend=False)
-    g.map_lower(sns.kdeplot, cmap="Blues_d", n_levels=5)
+    g.map_lower(sns.kdeplot, cmap="Blues_d", n_levels=4)
     for i, j in zip(*np.triu_indices_from(g.axes, 1)):
         g.axes[i, j].set_visible(False)
     g.fig.subplots_adjust(top=0.95)

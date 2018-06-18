@@ -49,7 +49,7 @@ sigma = np.sqrt(10 ** -2) #size of the noise in observations
 dim_U = 3
 length = 10 ** 5 #length of MCMC
 burn_time = 1000
-num_design_points = 20 #in each dimension
+num_design_points = 17 #in each dimension
 speed_random_walk = 0.1
 #End points of n-dim lattice for the design points
 min_range = -1
@@ -90,7 +90,7 @@ if flag_run_MCMC:
     print('Observation of solution to PDE at', x, 'is:')
     print(y)
     
-    if 0:
+    if 1:
         density_post = lambda u: np.exp(-phi(u))*density_prior(u)
         name = 'True posterior'
         short_name = 'true'
@@ -104,7 +104,7 @@ if flag_run_MCMC:
         run_mean = MCMC_helper(density_post, name, short_name)
         save_data(run_mean, short_name)
         
-    if 0:
+    if 1:
         density_post = lambda u: np.exp(-GP.GP_eval(u))*density_prior(u)
         name = 'GP - one evaluation'
         short_name = 'GP'

@@ -15,7 +15,6 @@ k(x; u) = 1/100 + \sum_j^d u_j/(200(d + 1)) * sin(2\pi jx),
 where u \in [-1,1]^d and the truth u^* is randomly generated."""
 
 import numpy as np
-import matplotlib.pyplot as plt
 from scipy.stats import lognorm
 import os
 
@@ -86,7 +85,7 @@ if flag_run_MCMC:
     print('Solution to PDE at',x,'for true parameter is:')
     print(G_k_dagger)    
     
-    if 0:
+    if 1:
         density_post = lambda u: np.exp(-phi(u))*density_prior(u)
         name = 'True posterior'
         short_name = 'true'
@@ -100,7 +99,7 @@ if flag_run_MCMC:
         run_mean = MCMC_helper(density_post, name, short_name)
         save_data(run_mean, short_name)
         
-    if 0:
+    if 1:
         density_post = lambda u: np.exp(-GP.GP_eval(u))*density_prior(u)
         name = 'GP - one evaluation'
         short_name = 'GP'
