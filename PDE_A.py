@@ -8,9 +8,16 @@ k(x; u) = 1/100 + \sum_j^d u_j/(200(d + 1)) * sin(2\pi jx)"""
 
 import numpy as np
 from scipy.sparse import diags
-from scipy.sparse.linalg import spsolve
+
 #Quicker sparse LA solver: install via: 'conda install -c haasad pypardiso'
-#from pypardiso import spsolve
+#Import if installed
+import importlib
+pypardiso_spec = importlib.util.find_spec("pypardiso")
+found_pypardiso = pypardiso_spec is not None
+if found_pypardiso:
+    from pypardiso import spsolve
+else:
+    from scipy.sparse.linalg import spsolve
 
 import matplotlib.pyplot as plt
 

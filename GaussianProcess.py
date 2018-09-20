@@ -1,8 +1,3 @@
-""" Data storage methods:
-    If dim = 1 then just keep a sorted list of points
-    If dim >= 2 then uses triangulation from qhull to searc and insert"""
-
-
 import numpy as np
 import math
 import numbers
@@ -162,7 +157,7 @@ class GaussianProcess:
         if len(x.shape) == 1:
             x = x.reshape(1, self.dim)
         
-        """First find closest 2*d points to x
+        """First find closest 3*d points to x
         Code is good in 1d but bad in n dim
         Ideally create RTree but first do naive thing.
         Runs in O(n) time instead of O(log(n)) for RTree insertion and nearest neighbour
@@ -188,7 +183,7 @@ class GaussianProcess:
         return data_new
     
     def find_closest(self, x):
-        """Finds a closest points to x in each signed direction
+        """Finds closest 3*dim points to x in each signed direction
         Returns: ind, points
         index an array of lists and the closest points 
         """
