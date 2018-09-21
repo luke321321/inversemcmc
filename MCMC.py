@@ -70,7 +70,6 @@ def runMCMC(dens, length, speed_random_walk, x0, x, N, name, short_name,
     print('Average error from true values is:', np.sqrt(np.sum((sol_at_mean - sol_true)**2))/len(x))
     print('Average error from observed values is:', np.sqrt(np.sum((sol_at_mean - sol_obs)**2))/len(x))
     plot_dist(run, name, short_name)
-    np.save(os.path.join('output', 'run_' + short_name), run)
     return run
 
 def plot_dist(dist, title, short_name):
