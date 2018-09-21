@@ -90,8 +90,9 @@ class GaussianProcess:
 
     def GP_at_points(self, points, num_evals=1):
         """Returns a Gaussian Process evalued at the grid points"""
-        val = np.random.multivariate_normal(self.mean(points), self.kernel(points, points),
-                                             num_evals)
+        mean = self.mean(points)
+        kernel = self.kernel(points, points)
+        val = np.random.multivariate_normal(mean, kernel, num_evals)
         if num_evals > 1:
             val = val.T
         return val
@@ -149,13 +150,22 @@ class GaussianProcess:
         plt.plot(X, Y)
         plt.show()
     
-    def GP_eval(self, x):
+    def GP_eval(self, x, save=True, num_evals=1):
+        """
+        Evaluates the GP at the point x and saves this point to the list of generated points.
+        If save=False and num_evals>1 then returns num_evals of GP at x and doesn't save any of them.
+        These options are used for the marginal approximation.
+        """
         #first check lengeth of array X and Y and expand if necessary
         self.check_mem()
         
         #make sure shape of x is (1, dim)
         if len(x.shape) == 1:
             x = x.reshape(1, self.dim)
+        
+        #Haven't removed save=True variable to make developer explicitly aware of this behaviour
+        if save is True and num_evals is not 1:
+            raise ValueError('When save=True then num_evals must be 1.')
         
         """First find closest 3*d points to x
         Code is good in 1d but bad in n dim
@@ -177,11 +187,11 @@ class GaussianProcess:
         elif dist[ind_min_dist] < self.tol:
             data_new = self.Y[ind_min_dist]
         else:
-            data_new = self.GP_bridge(x, points, data)
-            self.add_data(ind, x, data_new)
-
+            data_new = self.GP_bridge(x, points, data, size=num_evals)
+            if save is True:
+                self.add_data(ind, x, data_new)
         return data_new
-    
+      
     def find_closest(self, x):
         """Finds closest 3*dim points to x in each signed direction
         Returns: ind, points
@@ -279,15 +289,13 @@ class GaussianProcess:
             self.X = np.concatenate((self.X, np.zeros(self.X.shape, dtype=self.X.dtype)))
             self.Y = np.concatenate((self.Y, np.zeros(self.Y.shape, dtype=self.Y.dtype)))
     
-    def GP_bridge(self, x, points, data):
+    def GP_bridge(self, x, points, data, size=1):
         """Uses a small Gaussian process to evaluate the GP at x given it at points
         
         x: point to calculate the GP at
         Points: np array (x0, x1, ...)
-        Data: np array (f(x0), f(x1), ...)"""
-        
-#        if len(x.shape) == 1:
-#            x = x[np.newaxis, :]
+        Data: np array (f(x0), f(x1), ...)
+        size: the number of evaluations to return"""
         
         mean, ker = self.create_matern(data = data, points = points)
 
@@ -296,9 +304,11 @@ class GaussianProcess:
         all_pts = np.concatenate((x, points))
         m = np.squeeze(mean(all_pts))
         k = ker(all_pts, all_pts)
-        val = np.random.multivariate_normal(m, k, check_valid='ignore')
-        return val[0]
-
+        val = np.random.multivariate_normal(m, k, size, check_valid='ignore')
+        if size == 1:
+            return val[0,0]
+        else:
+            return val[:,0]
 
     @staticmethod
     def create_uniform_grid(min_range, max_range, n, dim=1):

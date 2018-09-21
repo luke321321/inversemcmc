@@ -65,8 +65,7 @@ def runMCMC(dens, length, speed_random_walk, x0, x, N, name, short_name,
     print('Mean is:', mean)
     print('We accepted this number of times:', accepts)
     sol_at_mean = PDE.solve_at_x(mean, N, x)
-    print('Solution to PDE at mean is:')
-    print(sol_at_mean)
+    print('Solution to PDE at mean is: \n', sol_at_mean)
     
     print('Average error from true values is:', np.sqrt(np.sum((sol_at_mean - sol_true)**2))/len(x))
     print('Average error from observed values is:', np.sqrt(np.sum((sol_at_mean - sol_obs)**2))/len(x))

@@ -44,13 +44,13 @@ sigma = np.sqrt(10 ** -3) #size of the noise in observations
 dim_k = 3
 length = 10 ** 5 #length of MCMC
 burn_time = 3000
-num_design_points = 20 #in each dimension
+num_design_points = 10 #in each dimension
 speed_random_walk = 0.05
 num_obs = 9
 #num_obs evenly spaced points in (0,1)
 x = np.arange(1, num_obs + 1)/(num_obs + 1)
 #N: number basis functions for solving PDE
-N = 2 ** 7
+N = 2 ** 10
 
 #Generate data
 #The truth k_dagger
@@ -94,10 +94,20 @@ if flag_run_MCMC:
     
     if 1:
         density_post = lambda u: np.exp(-GP.mean(u))*density_prior(u)
-        name = 'GP as mean - ie marginal approximation'
+        name = 'GP as mean'
         short_name = 'mean'
         run_mean = MCMC_helper(density_post, name, short_name)
         save_data(run_mean, short_name)
+        
+    if 1:
+        #estimate each point of GP as expectation of 100 GP evaluations 
+        #(could increase num_expect affecting runtime)
+        num_expect=100
+        density_post = lambda u: np.sum(np.exp(-GP.GP_eval(u,save=False,num_evals=num_expect))*density_prior(u))/num_expect
+        name = 'GP as marginal approximation'
+        short_name = 'marginal'
+        run_marg = MCMC_helper(density_post, name, short_name)
+        save_data(run_marg, short_name)
         
     if 1:
         density_post = lambda u: np.exp(-GP.GP_eval(u))*density_prior(u)

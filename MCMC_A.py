@@ -49,7 +49,7 @@ sigma = np.sqrt(10 ** -2) #size of the noise in observations
 dim_U = 3
 length = 10 ** 5 #length of MCMC
 burn_time = 1000
-num_design_points = 17 #in each dimension
+num_design_points = 10 #in each dimension
 speed_random_walk = 0.1
 #End points of n-dim lattice for the design points
 min_range = -1
@@ -59,7 +59,7 @@ num_obs = 20
 x = np.arange(1, num_obs+1)/(num_obs + 1)
 
 #N: number basis functions for solving PDE
-N = 2 ** 7
+N = 2 ** 10
 
 #Generate data
 #The truth u_dagger lives in [-1,1]
@@ -85,26 +85,34 @@ flag_run_MCMC = 1
 if flag_run_MCMC:
     x0 = np.zeros(dim_U)
     print('Parameter is:', u_dagger)
-    print('Solution to PDE at', x, 'for true parameter is:')
-    print(G_u_dagger)
-    print('Observation of solution to PDE at', x, 'is:')
-    print(y)
+    print('Solution to PDE at', x, 'for true parameter is: \n', G_u_dagger)
+    print('Observation of solution to PDE at', x, 'is: \n', y)
     
-    if 1:
+    if 0:
         density_post = lambda u: np.exp(-phi(u))*density_prior(u)
         name = 'True posterior'
         short_name = 'true'
         run_true = MCMC_helper(density_post, name, short_name)
         save_data(run_true, short_name)
     
-    if 1:
+    if 0:
         density_post = lambda u: np.exp(-GP.mean(u))*density_prior(u)
-        name = 'GP as mean - ie marginal approximation'
+        name = 'GP as mean'
         short_name = 'mean'
         run_mean = MCMC_helper(density_post, name, short_name)
         save_data(run_mean, short_name)
-        
+    
     if 1:
+        #estimate each point of GP as expectation of 100 GP evaluations 
+        #(could increase num_expect affecting runtime)
+        num_expect=100
+        density_post = lambda u: np.sum(np.exp(-GP.GP_eval(u,save=False,num_evals=num_expect))*density_prior(u))/num_expect
+        name = 'GP as marginal approximation'
+        short_name = 'marginal'
+        run_marg = MCMC_helper(density_post, name, short_name)
+        save_data(run_marg, short_name)
+        
+    if 0:
         density_post = lambda u: np.exp(-GP.GP_eval(u))*density_prior(u)
         name = 'GP - one evaluation'
         short_name = 'GP'
