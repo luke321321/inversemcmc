@@ -370,14 +370,17 @@ class GaussianProcess:
             U = u[np.newaxis, :]
             r2 = np.sum(np.square(U - v), 1)
         else:
-            #Deal with large u and v incase of out of memory errors
+            #Can't do it this faster way since get rounding errors when u and v are close
+            #(u-v) = u**2 + v**2 - 2uv
+            _flag_memory_ok = True
             try:
-                U = u[:, np.newaxis, :]
-                V = v[np.newaxis,...]
-                r2 = np.squeeze(np.sum(np.square(U - V), 2))
+                #Try to allocate memory to the large array
+                uv = np.zeros((u.shape[0],v.shape[0],v.shape[1]))
             except MemoryError:
+                _flag_memory_ok = False
                 #try to sum a slower way instead without creating a large intermediate array
                 r2 = np.zeros((u.shape[0], v.shape[0]))
+                #sum way with the shortest for loop
                 if u.shape[0] < v.shape[0]:
                     for i in range(u.shape[0]):
                         r2[i,:] = np.sum(np.square(u[i][np.newaxis, :] - v), 1)
@@ -385,4 +388,10 @@ class GaussianProcess:
                     for j in range(v.shape[0]):
                         r2[:,j] = np.sum(np.square(u - v[j][np.newaxis, :]), 1)
                 r2 = np.squeeze(r2)
+                #Deal with large u and v incase of out of memory errors
+            if _flag_memory_ok:
+                U = u[:, np.newaxis, :]
+                V = v[np.newaxis,...]
+                uv = U - V
+                r2 = np.squeeze(np.sum(np.square(uv), 2))
         return r2

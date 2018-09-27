@@ -22,19 +22,19 @@ For `MCMC_A.py` with 100,000 length MCMC run, 3 dimensional parameter family, 10
 
 Approximation | Time (mm:ss) 
  ---- | ---- 
-True posterior (solving the PDE) | 4:09
+True posterior (solving the PDE) | 3:57
 GP as mean | 0:07 
-GP as marginal approximation | 1:18 
-GP as random appoximation (one evaluation only) | 8:18
+GP as marginal approximation | 1:12 
+GP as random appoximation (one evaluation only) | 6:38
 
 For `MCMC_CGSSZ.py` with 100,000 length MCMC run, 3 dimensional parameter family, 1000 design points in total, using 1024 basis functions to solve the PDE and 9 observations we have:
 
 Approximation | Time (mm:ss) 
  ---- | ---- 
 True posterior (solving the PDE) | 4:35
-GP as mean | 0:34 
-GP as marginal approximation | 1:54 
-GP as random appoximation (one evaluation only) | 7:09
+GP as mean | 0:31 
+GP as marginal approximation | 1:33 
+GP as random appoximation (one evaluation only) | 6:38
 
 ### How do I get set up? ###
 
