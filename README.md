@@ -12,6 +12,8 @@ Using an R* Tree (or another tree type data structure) we could potentially redu
 
 ### Results ###
 
+Using a Gaussian process as a marginal approximation is recommended.  This is due to it running quicker than a random approximation - we don't have to compute any convex hulls and both the marginal and random approximation having the same theoretical convergence speed.
+
 The results for both of these examples are in the `output` folder.
 
 Distribution using *true* solution to the PDE:
